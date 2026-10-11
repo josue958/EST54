@@ -126,26 +126,35 @@
       <div class="hero-headline">
         <div class="hero-title-group">
           <div class="hero-title-with-logo">
-            <img src="Imagenes/Escudo_54.jpg" alt="Escudo Oficial de la Escuela Secundaria Técnica 54" class="hero-school-logo" />
+            <img src="Imagenes/Escudo_54.jpg" alt="Escudo Oficial de la Escuela Secundaria Técnica 54"
+              class="hero-school-logo" />
             <h1>Escuela Secundaria Tecnica 54 "Ignacio Ramirez"</h1>
           </div>
-          <p>Explora recursos académicos, fichas interactivas y materiales oficiales por grado.</p>
+          <p>Explora recursos académicos, fichas interactivas y materiales por grado.</p>
         </div>
       </div>
 
-      <!-- Barra de Navegación de los 3 Grados Obligatorios -->
-      <nav class="grados-tab-bar" aria-label="Secciones por Grado">
-        <button class="grado-tab active" data-grado="1" id="tab-grado-1">
+      <!-- Barra de Navegación de Grados, Eventos y Gestión de Usuarios -->
+      <nav class="grados-tab-bar" aria-label="Secciones del Sitio">
+        <button class="nav-main-tab active" data-tab="grado" data-grado="1" id="tab-grado-1">
           <span class="grado-badge-num">1</span>
           <span>Primer Grado</span>
         </button>
-        <button class="grado-tab" data-grado="2" id="tab-grado-2">
+        <button class="nav-main-tab" data-tab="grado" data-grado="2" id="tab-grado-2">
           <span class="grado-badge-num">2</span>
           <span>Segundo Grado</span>
         </button>
-        <button class="grado-tab" data-grado="3" id="tab-grado-3">
+        <button class="nav-main-tab" data-tab="grado" data-grado="3" id="tab-grado-3">
           <span class="grado-badge-num">3</span>
           <span>Tercer Grado</span>
+        </button>
+        <button class="nav-main-tab" data-tab="eventos" id="tab-eventos">
+          <span class="tab-icon-pill">🎉</span>
+          <span>Eventos y Difusión</span>
+        </button>
+        <button class="nav-main-tab tab-admin-only" data-tab="usuarios" id="tab-usuarios" style="display: none;">
+          <span class="tab-icon-pill">👥</span>
+          <span>Usuarios y Permisos</span>
         </button>
       </nav>
     </div>
@@ -156,37 +165,106 @@
        ========================================================================== -->
   <main class="main-wrapper" id="main-content">
 
-    <!-- Filtros Horizontales por Materia -->
-    <section class="filter-section" aria-label="Filtro por materias">
-      <div class="filter-header">
-        <span class="filter-title">Materias del Grado</span>
-      </div>
-      <div class="materias-filter-list" id="materias-filter-container">
-        <!-- Renderizado dinámico desde JS -->
-      </div>
-    </section>
+    <!-- VISTA 1: CONTENIDOS DE ESTUDIO POR GRADO (1°, 2°, 3°) -->
+    <div id="view-study" class="tab-view active">
+      <!-- Filtros Horizontales por Materia -->
+      <section class="filter-section" aria-label="Filtro por materias">
+        <div class="filter-header">
+          <span class="filter-title">Materias del Grado</span>
+        </div>
+        <div class="materias-filter-list" id="materias-filter-container">
+          <!-- Renderizado dinámico desde JS -->
+        </div>
+      </section>
 
-    <!-- Barra de Estado y Acciones Rápidas -->
-    <div class="sub-bar-status">
-      <span class="results-count-text" id="results-count">Cargando elementos...</span>
+      <!-- Barra de Estado y Acciones Rápidas -->
+      <div class="sub-bar-status">
+        <span class="results-count-text" id="results-count">Cargando elementos...</span>
 
-      <div class="admin-quick-actions">
-        <span style="font-size: 0.8rem; color: var(--text-secondary); font-weight: 600;">
-          Modo Administrador: Puedes arrastrar para ordenar (Drag & Drop)
-        </span>
+        <div class="admin-quick-actions">
+          <span style="font-size: 0.8rem; color: var(--text-secondary); font-weight: 600;">
+            Modo Administrador: Puedes arrastrar para ordenar (Drag & Drop)
+          </span>
+        </div>
+      </div>
+
+      <!-- Grid de Tarjetas (Artículos, Fichas, Archivos, Imágenes) -->
+      <section class="blocks-grid" id="content-blocks-grid" aria-label="Lista de recursos de estudio">
+        <!-- Los bloques se inyectan dinámicamente mediante app.js -->
+      </section>
+
+      <!-- Estado Vacío si la búsqueda no arroja resultados -->
+      <div class="empty-state" id="empty-state">
+        <div class="empty-state-icon">🔍</div>
+        <h3>No se encontraron recursos</h3>
+        <p>Intenta con otros términos de búsqueda o selecciona otra materia.</p>
       </div>
     </div>
 
-    <!-- Grid de Tarjetas (Artículos, Fichas, Archivos, Imágenes) -->
-    <section class="blocks-grid" id="content-blocks-grid" aria-label="Lista de recursos de estudio">
-      <!-- Los bloques se inyectan dinámicamente mediante app.js -->
-    </section>
+    <!-- VISTA 2: EVENTOS ESCOLARES Y DIFUSIÓN EN REDES SOCIALES -->
+    <div id="view-events" class="tab-view" style="display: none;">
+      <div class="section-banner-header">
+        <div>
+          <h2 class="section-banner-title">🎉 Eventos y Vida Escolar EST 54</h2>
+          <p class="section-banner-sub">
+            Conoce las actividades institucionales, torneos y festivales. Comparte y republica al instante en <strong>Facebook</strong>, <strong>Instagram</strong> y <strong>TikTok</strong>.
+          </p>
+        </div>
+        <button class="btn-primary-action" id="btn-create-event" style="display: none;">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+            <line x1="12" y1="5" x2="12" y2="19"></line>
+            <line x1="5" y1="12" x2="19" y2="12"></line>
+          </svg>
+          <span>Publicar Evento</span>
+        </button>
+      </div>
 
-    <!-- Estado Vacío si la búsqueda no arroja resultados -->
-    <div class="empty-state" id="empty-state">
-      <div class="empty-state-icon">🔍</div>
-      <h3>No se encontraron recursos</h3>
-      <p>Intenta con otros términos de búsqueda o selecciona otra materia.</p>
+      <div class="events-grid" id="events-grid">
+        <!-- Tarjetas de eventos renderizadas dinámicamente -->
+      </div>
+
+      <div class="empty-state" id="empty-events-state" style="display: none;">
+        <div class="empty-state-icon">📅</div>
+        <h3>No hay eventos registrados actualmente</h3>
+        <p>Vuelve pronto para consultar las próximas convocatorias y festividades de la escuela.</p>
+      </div>
+    </div>
+
+    <!-- VISTA 3: ADMINISTRACIÓN CRUD DE USUARIOS Y PERMISOS (SOLO ADMIN) -->
+    <div id="view-users" class="tab-view" style="display: none;">
+      <div class="section-banner-header">
+        <div>
+          <h2 class="section-banner-title">👥 Panel de Usuarios y Permisos de Edición</h2>
+          <p class="section-banner-sub">
+            Da de alta docentes, asigna contraseñas y define con precisión qué grados (1°, 2°, 3°) o secciones pueden editar.
+          </p>
+        </div>
+        <button class="btn-primary-action" id="btn-create-user">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+            <line x1="12" y1="5" x2="12" y2="19"></line>
+            <line x1="5" y1="12" x2="19" y2="12"></line>
+          </svg>
+          <span>Nuevo Usuario</span>
+        </button>
+      </div>
+
+      <!-- Tabla CRUD de Usuarios -->
+      <div class="users-table-container">
+        <table class="users-table">
+          <thead>
+            <tr>
+              <th>Usuario</th>
+              <th>Nombre Completo</th>
+              <th>Rol / Cargo</th>
+              <th>Permisos Asignados</th>
+              <th style="text-align: right;">Acciones</th>
+            </tr>
+          </thead>
+          <tbody id="users-table-body">
+            <!-- Filas inyectadas dinámicamente -->
+          </tbody>
+        </table>
+      </div>
     </div>
 
   </main>
@@ -425,6 +503,238 @@
             </button>
             <button type="submit" class="btn-primary-action">
               Guardar en Base de Datos
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <!-- ==========================================================================
+       MODAL: CREAR / EDITAR EVENTO ESCOLAR
+       ========================================================================== -->
+  <div class="modal-overlay" id="event-editor-modal" role="dialog" aria-modal="true" aria-labelledby="event-editor-modal-title">
+    <div class="modal-content modal-content-lg">
+      <div class="modal-header">
+        <h2 class="modal-title" id="event-editor-modal-title">Publicar Evento Escolar</h2>
+        <button class="btn-modal-close" id="close-event-editor-modal" aria-label="Cerrar">&times;</button>
+      </div>
+      <div class="modal-body">
+        <form id="event-editor-form">
+          <input type="hidden" id="event-id" />
+
+          <div class="form-row">
+            <div class="form-group">
+              <label for="event-title">Título del Evento</label>
+              <input type="text" id="event-title" class="form-input" placeholder="ej. Feria de Ciencias 2026" required />
+            </div>
+            <div class="form-group">
+              <label for="event-badge">Categoría / Distintivo</label>
+              <input type="text" id="event-badge" class="form-input" placeholder="ej. Institucional, Deportes, Cultura..." required />
+            </div>
+          </div>
+
+          <div class="form-row">
+            <div class="form-group">
+              <label for="event-date">Fecha del Evento</label>
+              <input type="date" id="event-date" class="form-input" required />
+            </div>
+            <div class="form-group">
+              <label for="event-time">Hora y Lugar</label>
+              <input type="text" id="event-time" class="form-input" placeholder="ej. 09:00 AM - Patio Cívico" />
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label for="event-desc">Descripción Completa del Evento</label>
+            <textarea id="event-desc" class="form-textarea" rows="3" placeholder="Detalles, bases, participantes y dinámicas del evento..." required></textarea>
+          </div>
+
+          <div class="form-group">
+            <label for="event-tags">Hashtags / Etiquetas para Redes Sociales</label>
+            <input type="text" id="event-tags" class="form-input" placeholder="ej. EST54, SecundariaTecnica, OrgulloTecnico, Deportes" />
+            <small class="form-hint">Se incluirán automáticamente al compartir en Facebook, Instagram y TikTok.</small>
+          </div>
+
+          <!-- Imagen del Evento -->
+          <div class="form-group">
+            <label>Subir Imagen del Evento (desde tu computadora o celular)</label>
+            <input type="file" id="event-image-file" accept="image/*" class="form-file-input" />
+          </div>
+
+          <div class="form-group">
+            <label for="event-image-url">O URL de la Imagen</label>
+            <input type="text" id="event-image-url" class="form-input" placeholder="https://..." />
+          </div>
+
+          <div class="image-preview-box" id="event-image-preview-wrap" style="display: none;">
+            <img id="event-image-preview" src="" alt="Vista previa de imagen del evento" />
+          </div>
+
+          <div style="display: flex; justify-content: flex-end; gap: 12px; margin-top: 24px;">
+            <button type="button" class="btn-secondary-action" onclick="document.getElementById('event-editor-modal').classList.remove('open')">
+              Cancelar
+            </button>
+            <button type="submit" class="btn-primary-action">
+              Guardar y Publicar Evento
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <!-- ==========================================================================
+       MODAL: COMPARTIR Y REPUBLICAR EN REDES SOCIALES (FB, IG, TIKTOK)
+       ========================================================================== -->
+  <div class="modal-overlay" id="social-share-modal" role="dialog" aria-modal="true" aria-labelledby="social-modal-title">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h2 class="modal-title" id="social-modal-title">Difundir en Redes Sociales</h2>
+        <button class="btn-modal-close" id="close-social-share-modal" aria-label="Cerrar">&times;</button>
+      </div>
+      <div class="modal-body">
+        <div class="social-share-card-preview">
+          <img id="social-share-preview-img" src="" alt="Evento" class="social-preview-thumbnail" />
+          <div>
+            <h4 id="social-share-preview-title" style="font-size: 1rem; font-weight: 800; color: var(--text-main); margin-bottom: 4px;">Evento</h4>
+            <p id="social-share-preview-date" style="font-size: 0.82rem; color: var(--text-secondary);"></p>
+          </div>
+        </div>
+
+        <p style="font-size: 0.88rem; color: var(--text-secondary); margin: 16px 0 12px 0;">
+          Selecciona la red social donde deseas postear o republicar este evento:
+        </p>
+
+        <div class="social-buttons-list">
+          <!-- Facebook -->
+          <button class="btn-social-direct btn-social-facebook" id="btn-share-facebook">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
+              <path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z"/>
+            </svg>
+            <span>Publicar en Facebook</span>
+          </button>
+
+          <!-- Instagram -->
+          <button class="btn-social-direct btn-social-instagram" id="btn-share-instagram">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
+              <path d="M12 2.163c3.204 0 3.584.012 4.85.07 3.252.148 4.771 1.691 4.919 4.919.058 1.265.069 1.645.069 4.849 0 3.205-.012 3.584-.069 4.849-.149 3.225-1.664 4.771-4.919 4.919-1.266.058-1.644.07-4.85.07-3.204 0-3.584-.012-4.849-.07-3.26-.149-4.771-1.699-4.919-4.92-.058-1.265-.07-1.644-.07-4.849 0-3.204.013-3.583.07-4.849.149-3.227 1.664-4.771 4.919-4.919 1.266-.057 1.645-.069 4.849-.069zm0-2.163c-3.259 0-3.667.014-4.947.072-4.358.2-6.78 2.618-6.98 6.98-.059 1.281-.073 1.689-.073 4.948 0 3.259.014 3.668.072 4.948.2 4.358 2.618 6.78 6.98 6.98 1.281.058 1.689.072 4.948.072 3.259 0 3.668-.014 4.948-.072 4.354-.2 6.782-2.618 6.979-6.98.059-1.28.073-1.689.073-4.948 0-3.259-.014-3.667-.072-4.947-.196-4.354-2.617-6.78-6.979-6.98-1.281-.059-1.69-.073-4.949-.073zm0 5.838c-3.403 0-6.162 2.759-6.162 6.162s2.759 6.163 6.162 6.163 6.162-2.759 6.162-6.163c0-3.403-2.759-6.162-6.162-6.162zm0 10.162c-2.209 0-4-1.79-4-4 0-2.209 1.791-4 4-4s4 1.791 4 4c0 2.21-1.791 4-4 4zm6.406-11.845c-.796 0-1.441.645-1.441 1.44s.645 1.44 1.441 1.44c.795 0 1.439-.645 1.439-1.44s-.644-1.44-1.439-1.44z"/>
+            </svg>
+            <span>Preparar Post para Instagram</span>
+          </button>
+
+          <!-- TikTok -->
+          <button class="btn-social-direct btn-social-tiktok" id="btn-share-tiktok">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
+              <path d="M19.589 6.686a4.793 4.793 0 0 1-3.77-4.245V2h-3.445v13.672a2.896 2.896 0 0 1-5.201 1.743 2.895 2.895 0 0 1 3.12-4.509V9.414a6.34 6.34 0 0 0-5.748 6.3c0 3.518 2.868 6.386 6.386 6.386a6.386 6.386 0 0 0 6.386-6.386V9.006a8.232 8.232 0 0 0 4.272 1.18V6.741c-.696 0-1.373-.018-2-.055z"/>
+            </svg>
+            <span>Preparar Publicación para TikTok</span>
+          </button>
+
+          <!-- Compartir Nativo (Móvil / Web Share) -->
+          <button class="btn-social-direct btn-social-native" id="btn-share-native">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <circle cx="18" cy="5" r="3"></circle>
+              <circle cx="6" cy="12" r="3"></circle>
+              <circle cx="18" cy="19" r="3"></circle>
+              <line x1="8.59" y1="13.51" x2="15.42" y2="17.49"></line>
+              <line x1="15.41" y1="6.51" x2="8.59" y2="10.49"></line>
+            </svg>
+            <span>Compartir en Apps del Teléfono</span>
+          </button>
+        </div>
+
+        <div class="caption-copy-box">
+          <label style="font-size: 0.8rem; font-weight: 700; color: var(--text-main); display: block; margin-bottom: 6px;">
+            Texto y Hashtags listos para copiar:
+          </label>
+          <textarea id="social-share-caption-text" class="form-textarea" rows="4" readonly></textarea>
+          <div style="display: flex; gap: 8px; margin-top: 8px;">
+            <button type="button" class="btn-secondary-action" id="btn-copy-social-caption" style="flex: 1; justify-content: center;">
+              📋 Copiar Texto y Hashtags
+            </button>
+            <button type="button" class="btn-secondary-action" id="btn-download-social-image" style="flex: 1; justify-content: center;">
+              📥 Descargar Foto para Subir
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ==========================================================================
+       MODAL: CREAR / EDITAR USUARIO Y PERMISOS (CRUD COMPLETO)
+       ========================================================================== -->
+  <div class="modal-overlay" id="user-editor-modal" role="dialog" aria-modal="true" aria-labelledby="user-editor-modal-title">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h2 class="modal-title" id="user-editor-modal-title">Registrar Usuario</h2>
+        <button class="btn-modal-close" id="close-user-editor-modal" aria-label="Cerrar">&times;</button>
+      </div>
+      <div class="modal-body">
+        <form id="user-editor-form">
+          <input type="hidden" id="crud-user-id" />
+
+          <div class="form-group">
+            <label for="crud-user-displayname">Nombre Completo del Docente / Responsable</label>
+            <input type="text" id="crud-user-displayname" class="form-input" placeholder="ej. Profra. Laura Gómez Hernández" required />
+          </div>
+
+          <div class="form-row">
+            <div class="form-group">
+              <label for="crud-user-username">Nombre de Usuario (Login)</label>
+              <input type="text" id="crud-user-username" class="form-input" placeholder="ej. laura_gomez" required autocomplete="off" />
+            </div>
+            <div class="form-group">
+              <label for="crud-user-password">Contraseña de Acceso</label>
+              <input type="text" id="crud-user-password" class="form-input" placeholder="Asigna una contraseña segura" required autocomplete="off" />
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label for="crud-user-role">Cargo o Rol Escolar</label>
+            <select id="crud-user-role" class="form-select">
+              <option value="Docente de Asignatura">Docente de Asignatura</option>
+              <option value="Coordinador de Grado">Coordinador de Grado</option>
+              <option value="Comité de Difusión Cultural">Comité de Difusión Cultural</option>
+              <option value="Administrador Escolar">Administrador Escolar</option>
+            </select>
+          </div>
+
+          <div class="form-group">
+            <label style="display: block; margin-bottom: 8px; font-weight: 700;">
+              Permisos de Edición por Sección (Permisos Granulares)
+            </label>
+            <div class="permissions-checklist-box">
+              <label class="checkbox-label" style="margin-bottom: 8px;">
+                <input type="checkbox" id="perm-grado-1" />
+                <span><strong>Primer Grado:</strong> Puede agregar, editar y reordenar materias de 1°</span>
+              </label>
+              <label class="checkbox-label" style="margin-bottom: 8px;">
+                <input type="checkbox" id="perm-grado-2" />
+                <span><strong>Segundo Grado:</strong> Puede agregar, editar y reordenar materias de 2°</span>
+              </label>
+              <label class="checkbox-label" style="margin-bottom: 8px;">
+                <input type="checkbox" id="perm-grado-3" />
+                <span><strong>Tercer Grado:</strong> Puede agregar, editar y reordenar materias de 3°</span>
+              </label>
+              <label class="checkbox-label" style="margin-bottom: 8px;">
+                <input type="checkbox" id="perm-events" />
+                <span><strong>Eventos Escolares:</strong> Puede publicar, editar fotos y difundir eventos</span>
+              </label>
+              <label class="checkbox-label" style="margin-bottom: 4px; color: var(--color-primary);">
+                <input type="checkbox" id="perm-users" />
+                <span><strong>Administrar Usuarios:</strong> Puede dar de alta contraseñas y otros docentes</span>
+              </label>
+            </div>
+          </div>
+
+          <div style="display: flex; justify-content: flex-end; gap: 12px; margin-top: 24px;">
+            <button type="button" class="btn-secondary-action" onclick="document.getElementById('user-editor-modal').classList.remove('open')">
+              Cancelar
+            </button>
+            <button type="submit" class="btn-primary-action">
+              Guardar Usuario en Base de Datos
             </button>
           </div>
         </form>

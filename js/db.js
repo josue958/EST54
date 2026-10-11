@@ -1,12 +1,20 @@
 /**
- * EST 54 EduHub - Base de Datos Local con IndexedDB
+ * EST 54 EduHub - Base de Datos Local con IndexedDB (v2)
  * Compatible con GitHub Pages (100% estático en el cliente)
- * Persistencia permanente, soporte para imágenes Base64, archivos adjuntos y exportación/importación JSON.
+ * Persistencia permanente, soporte para imágenes Base64, archivos adjuntos,
+ * Publicación de Eventos Escolares con Redes Sociales y Gestión CRUD de Usuarios y Permisos.
  */
 
 const DB_NAME = 'EST54_EduHub_DB';
-const DB_VERSION = 1;
+const DB_VERSION = 2;
 const STORE_NAME = 'content_blocks';
+const STORE_EVENTS = 'events';
+const STORE_USERS = 'users';
+
+// Fallback keys para LocalStorage si IndexedDB no está disponible
+const STORAGE_BLOCKS_KEY = 'EST54_LOCAL_BLOCKS';
+const STORAGE_EVENTS_KEY = 'EST54_LOCAL_EVENTS';
+const STORAGE_USERS_KEY = 'EST54_LOCAL_USERS';
 
 // Datos Semilla Iniciales con contenido enriquecido para los 3 Grados y diversas Materias
 const INITIAL_DATA = [
@@ -244,11 +252,105 @@ Si un poste vertical mide 4 metros de altura y un cable de soporte se ancla en e
   }
 ];
 
+// Eventos Escolares Iniciales
+const INITIAL_EVENTS = [
+  {
+    id: 'event-1',
+    title: 'Muestra Anual de Proyectos Científicos y Tecnológicos 2026',
+    date: '2026-10-25',
+    time: '09:00 AM',
+    location: 'Laboratorios y Explanada EST 54',
+    description: 'Exposición interactiva de los alumnos de 1°, 2° y 3° grado presentando prototipos de energías renovables, modelos celulares y experimentos de física y química.',
+    badge: 'Evento Institucional',
+    imageUrl: 'https://images.unsplash.com/photo-1564981797816-1043664bf78d?auto=format&fit=crop&w=1200&q=80',
+    author: 'Prof. Josué',
+    tags: 'Ciencia, Tecnología, SecundariaTécnica54, Proyectos',
+    createdAt: '2026-10-11'
+  },
+  {
+    id: 'event-2',
+    title: 'Torneo Deportivo Interescolar de Otoño: Básquetbol y Fútbol',
+    date: '2026-11-04',
+    time: '08:30 AM',
+    location: 'Canchas Deportivas EST 54',
+    description: 'Gran jornada deportiva escolar donde nuestros representativos se enfrentarán a escuelas técnicas invitadas. ¡Ven con tu familia a apoyar a nuestros Halcones!',
+    badge: 'Deportes y Convivencia',
+    imageUrl: 'https://images.unsplash.com/photo-1546519638-68e109498ffc?auto=format&fit=crop&w=1200&q=80',
+    author: 'Prof. Josué',
+    tags: 'Deportes, Torneo, HalconesEST54, Convivencia',
+    createdAt: '2026-10-09'
+  },
+  {
+    id: 'event-3',
+    title: 'Festival Tradicional de Día de Muertos y Concurso de Calaveritas',
+    date: '2026-11-01',
+    time: '10:00 AM',
+    location: 'Patio Cívico',
+    description: 'Montaje de ofrendas prehispánicas monumentales dedicadas a personajes ilustres de la educación técnica, desfile de catrines y premiación de calaveritas literarias.',
+    badge: 'Cultura y Tradición',
+    imageUrl: 'https://images.unsplash.com/photo-1509198397868-475647b2a1e5?auto=format&fit=crop&w=1200&q=80',
+    author: 'Prof. Josué',
+    tags: 'DiaDeMuertos, TradicionesMexicanas, CulturaEST54',
+    createdAt: '2026-10-08'
+  }
+];
+
+// Usuarios Iniciales con Permisos CRUD
+const INITIAL_USERS = [
+  {
+    id: 'user-admin-root',
+    username: 'josue958',
+    password: 'Yoshi985',
+    displayName: 'Prof. Josué',
+    role: 'Super Administrador',
+    isSuperAdmin: true,
+    permissions: {
+      canEditGrado1: true,
+      canEditGrado2: true,
+      canEditGrado3: true,
+      canManageEvents: true,
+      canManageUsers: true
+    },
+    createdAt: '2026-10-01'
+  },
+  {
+    id: 'user-teacher-ciencias',
+    username: 'prof_martha',
+    password: 'Martha2026',
+    displayName: 'Profra. Martha (Ciencias)',
+    role: 'Docente de 1° Grado',
+    isSuperAdmin: false,
+    permissions: {
+      canEditGrado1: true,
+      canEditGrado2: false,
+      canEditGrado3: false,
+      canManageEvents: false,
+      canManageUsers: false
+    },
+    createdAt: '2026-10-05'
+  },
+  {
+    id: 'user-difusion',
+    username: 'difusion54',
+    password: 'Difusion2026',
+    displayName: 'Comité de Difusión Cultural',
+    role: 'Editor de Eventos y Redes',
+    isSuperAdmin: false,
+    permissions: {
+      canEditGrado1: false,
+      canEditGrado2: false,
+      canEditGrado3: false,
+      canManageEvents: true,
+      canManageUsers: false
+    },
+    createdAt: '2026-10-08'
+  }
+];
+
 class EST54Database {
   constructor() {
     this.db = null;
     this.isIndexedDBReady = false;
-    this.storageKey = 'EST54_LOCAL_STORAGE_BACKUP';
   }
 
   async init() {
@@ -264,11 +366,26 @@ class EST54Database {
 
       request.onupgradeneeded = (event) => {
         const db = event.target.result;
+
+        // Tienda de Bloques de Estudio
         if (!db.objectStoreNames.contains(STORE_NAME)) {
           const store = db.createObjectStore(STORE_NAME, { keyPath: 'id' });
           store.createIndex('grado', 'grado', { unique: false });
           store.createIndex('materia', 'materia', { unique: false });
           store.createIndex('order', 'order', { unique: false });
+        }
+
+        // Tienda de Eventos y Difusión
+        if (!db.objectStoreNames.contains(STORE_EVENTS)) {
+          const storeEvents = db.createObjectStore(STORE_EVENTS, { keyPath: 'id' });
+          storeEvents.createIndex('date', 'date', { unique: false });
+          storeEvents.createIndex('createdAt', 'createdAt', { unique: false });
+        }
+
+        // Tienda de Usuarios y Permisos
+        if (!db.objectStoreNames.contains(STORE_USERS)) {
+          const storeUsers = db.createObjectStore(STORE_USERS, { keyPath: 'id' });
+          storeUsers.createIndex('username', 'username', { unique: true });
         }
       };
 
@@ -276,11 +393,7 @@ class EST54Database {
         this.db = event.target.result;
         this.isIndexedDBReady = true;
 
-        // Verificar si la base de datos está vacía; si es así, cargar datos semilla
-        const count = await this._count();
-        if (count === 0) {
-          await this._seedInitialData();
-        }
+        await this._ensureSeedData();
         resolve(this);
       };
 
@@ -294,39 +407,67 @@ class EST54Database {
 
   _initLocalStorage() {
     this.isIndexedDBReady = false;
-    if (!localStorage.getItem(this.storageKey)) {
-      localStorage.setItem(this.storageKey, JSON.stringify(INITIAL_DATA));
+    if (!localStorage.getItem(STORAGE_BLOCKS_KEY)) {
+      localStorage.setItem(STORAGE_BLOCKS_KEY, JSON.stringify(INITIAL_DATA));
+    }
+    if (!localStorage.getItem(STORAGE_EVENTS_KEY)) {
+      localStorage.setItem(STORAGE_EVENTS_KEY, JSON.stringify(INITIAL_EVENTS));
+    }
+    if (!localStorage.getItem(STORAGE_USERS_KEY)) {
+      localStorage.setItem(STORAGE_USERS_KEY, JSON.stringify(INITIAL_USERS));
     }
   }
 
-  async _count() {
+  async _ensureSeedData() {
+    const blocksCount = await this._countStore(STORE_NAME);
+    if (blocksCount === 0) {
+      await this._seedStore(STORE_NAME, INITIAL_DATA);
+    }
+
+    const eventsCount = await this._countStore(STORE_EVENTS);
+    if (eventsCount === 0) {
+      await this._seedStore(STORE_EVENTS, INITIAL_EVENTS);
+    }
+
+    const usersCount = await this._countStore(STORE_USERS);
+    if (usersCount === 0) {
+      await this._seedStore(STORE_USERS, INITIAL_USERS);
+    }
+  }
+
+  async _countStore(storeName) {
     return new Promise((resolve) => {
-      const tx = this.db.transaction([STORE_NAME], 'readonly');
-      const store = tx.objectStore(STORE_NAME);
-      const req = store.count();
-      req.onsuccess = () => resolve(req.result);
-      req.onerror = () => resolve(0);
+      try {
+        const tx = this.db.transaction([storeName], 'readonly');
+        const store = tx.objectStore(storeName);
+        const req = store.count();
+        req.onsuccess = () => resolve(req.result);
+        req.onerror = () => resolve(0);
+      } catch (e) {
+        resolve(0);
+      }
     });
   }
 
-  async _seedInitialData() {
+  async _seedStore(storeName, dataArray) {
     return new Promise((resolve, reject) => {
-      const tx = this.db.transaction([STORE_NAME], 'readwrite');
-      const store = tx.objectStore(STORE_NAME);
-      for (const item of INITIAL_DATA) {
+      const tx = this.db.transaction([storeName], 'readwrite');
+      const store = tx.objectStore(storeName);
+      for (const item of dataArray) {
         store.put(item);
       }
-      tx.oncomplete = () => {
-        this._syncToLocalStorageBackup();
-        resolve();
-      };
+      tx.oncomplete = () => resolve();
       tx.onerror = () => reject(tx.error);
     });
   }
 
+  // ==========================================================================
+  // BLOQUES DE ESTUDIO (CRUD)
+  // ==========================================================================
+
   async getAllBlocks() {
     if (!this.isIndexedDBReady) {
-      const raw = localStorage.getItem(this.storageKey) || '[]';
+      const raw = localStorage.getItem(STORAGE_BLOCKS_KEY) || '[]';
       return JSON.parse(raw);
     }
 
@@ -349,21 +490,6 @@ class EST54Database {
       .sort((a, b) => (a.order || 0) - (b.order || 0));
   }
 
-  async getBlockById(id) {
-    if (!this.isIndexedDBReady) {
-      const all = JSON.parse(localStorage.getItem(this.storageKey) || '[]');
-      return all.find((b) => b.id === id) || null;
-    }
-
-    return new Promise((resolve, reject) => {
-      const tx = this.db.transaction([STORE_NAME], 'readonly');
-      const store = tx.objectStore(STORE_NAME);
-      const req = store.get(id);
-      req.onsuccess = () => resolve(req.result || null);
-      req.onerror = () => reject(req.error);
-    });
-  }
-
   async saveBlock(block) {
     if (!block.id) {
       block.id = 'block-' + Date.now() + '-' + Math.random().toString(36).substr(2, 6);
@@ -374,11 +500,11 @@ class EST54Database {
     }
 
     if (!this.isIndexedDBReady) {
-      const all = JSON.parse(localStorage.getItem(this.storageKey) || '[]');
+      const all = JSON.parse(localStorage.getItem(STORAGE_BLOCKS_KEY) || '[]');
       const index = all.findIndex((b) => b.id === block.id);
       if (index >= 0) all[index] = block;
       else all.push(block);
-      localStorage.setItem(this.storageKey, JSON.stringify(all));
+      localStorage.setItem(STORAGE_BLOCKS_KEY, JSON.stringify(all));
       return block;
     }
 
@@ -386,19 +512,16 @@ class EST54Database {
       const tx = this.db.transaction([STORE_NAME], 'readwrite');
       const store = tx.objectStore(STORE_NAME);
       const req = store.put(block);
-      req.onsuccess = () => {
-        this._syncToLocalStorageBackup();
-        resolve(block);
-      };
+      req.onsuccess = () => resolve(block);
       req.onerror = () => reject(req.error);
     });
   }
 
   async deleteBlock(id) {
     if (!this.isIndexedDBReady) {
-      let all = JSON.parse(localStorage.getItem(this.storageKey) || '[]');
+      let all = JSON.parse(localStorage.getItem(STORAGE_BLOCKS_KEY) || '[]');
       all = all.filter((b) => b.id !== id);
-      localStorage.setItem(this.storageKey, JSON.stringify(all));
+      localStorage.setItem(STORAGE_BLOCKS_KEY, JSON.stringify(all));
       return true;
     }
 
@@ -406,10 +529,7 @@ class EST54Database {
       const tx = this.db.transaction([STORE_NAME], 'readwrite');
       const store = tx.objectStore(STORE_NAME);
       const req = store.delete(id);
-      req.onsuccess = () => {
-        this._syncToLocalStorageBackup();
-        resolve(true);
-      };
+      req.onsuccess = () => resolve(true);
       req.onerror = () => reject(req.error);
     });
   }
@@ -424,7 +544,7 @@ class EST54Database {
           idMap.get(id).order = index;
         }
       });
-      localStorage.setItem(this.storageKey, JSON.stringify(Array.from(idMap.values())));
+      localStorage.setItem(STORAGE_BLOCKS_KEY, JSON.stringify(Array.from(idMap.values())));
       return true;
     }
 
@@ -440,42 +560,250 @@ class EST54Database {
         }
       });
 
-      tx.oncomplete = () => {
-        this._syncToLocalStorageBackup();
-        resolve(true);
-      };
+      tx.oncomplete = () => resolve(true);
       tx.onerror = () => reject(tx.error);
     });
   }
 
+  // ==========================================================================
+  // EVENTOS Y DIFUSIÓN (CRUD)
+  // ==========================================================================
+
+  async getAllEvents() {
+    if (!this.isIndexedDBReady) {
+      const raw = localStorage.getItem(STORAGE_EVENTS_KEY) || '[]';
+      return JSON.parse(raw);
+    }
+
+    return new Promise((resolve, reject) => {
+      const tx = this.db.transaction([STORE_EVENTS], 'readonly');
+      const store = tx.objectStore(STORE_EVENTS);
+      const req = store.getAll();
+      req.onsuccess = () => {
+        // Ordenar por fecha descendente o creación
+        const sorted = (req.result || []).sort((a, b) => (b.date || '').localeCompare(a.date || ''));
+        resolve(sorted);
+      };
+      req.onerror = () => reject(req.error);
+    });
+  }
+
+  async getEventById(id) {
+    if (!this.isIndexedDBReady) {
+      const all = JSON.parse(localStorage.getItem(STORAGE_EVENTS_KEY) || '[]');
+      return all.find((e) => e.id === id) || null;
+    }
+
+    return new Promise((resolve, reject) => {
+      const tx = this.db.transaction([STORE_EVENTS], 'readonly');
+      const store = tx.objectStore(STORE_EVENTS);
+      const req = store.get(id);
+      req.onsuccess = () => resolve(req.result || null);
+      req.onerror = () => reject(req.error);
+    });
+  }
+
+  async saveEvent(event) {
+    if (!event.id) {
+      event.id = 'event-' + Date.now() + '-' + Math.random().toString(36).substr(2, 6);
+    }
+    if (!event.createdAt) {
+      event.createdAt = new Date().toISOString().split('T')[0];
+    }
+
+    if (!this.isIndexedDBReady) {
+      const all = JSON.parse(localStorage.getItem(STORAGE_EVENTS_KEY) || '[]');
+      const index = all.findIndex((e) => e.id === event.id);
+      if (index >= 0) all[index] = event;
+      else all.unshift(event);
+      localStorage.setItem(STORAGE_EVENTS_KEY, JSON.stringify(all));
+      return event;
+    }
+
+    return new Promise((resolve, reject) => {
+      const tx = this.db.transaction([STORE_EVENTS], 'readwrite');
+      const store = tx.objectStore(STORE_EVENTS);
+      const req = store.put(event);
+      req.onsuccess = () => resolve(event);
+      req.onerror = () => reject(req.error);
+    });
+  }
+
+  async deleteEvent(id) {
+    if (!this.isIndexedDBReady) {
+      let all = JSON.parse(localStorage.getItem(STORAGE_EVENTS_KEY) || '[]');
+      all = all.filter((e) => e.id !== id);
+      localStorage.setItem(STORAGE_EVENTS_KEY, JSON.stringify(all));
+      return true;
+    }
+
+    return new Promise((resolve, reject) => {
+      const tx = this.db.transaction([STORE_EVENTS], 'readwrite');
+      const store = tx.objectStore(STORE_EVENTS);
+      const req = store.delete(id);
+      req.onsuccess = () => resolve(true);
+      req.onerror = () => reject(req.error);
+    });
+  }
+
+  // ==========================================================================
+  // USUARIOS Y PERMISOS (CRUD)
+  // ==========================================================================
+
+  async getAllUsers() {
+    if (!this.isIndexedDBReady) {
+      const raw = localStorage.getItem(STORAGE_USERS_KEY) || '[]';
+      return JSON.parse(raw);
+    }
+
+    return new Promise((resolve, reject) => {
+      const tx = this.db.transaction([STORE_USERS], 'readonly');
+      const store = tx.objectStore(STORE_USERS);
+      const req = store.getAll();
+      req.onsuccess = () => resolve(req.result || []);
+      req.onerror = () => reject(req.error);
+    });
+  }
+
+  async getUserById(id) {
+    if (!this.isIndexedDBReady) {
+      const all = JSON.parse(localStorage.getItem(STORAGE_USERS_KEY) || '[]');
+      return all.find((u) => u.id === id) || null;
+    }
+
+    return new Promise((resolve, reject) => {
+      const tx = this.db.transaction([STORE_USERS], 'readonly');
+      const store = tx.objectStore(STORE_USERS);
+      const req = store.get(id);
+      req.onsuccess = () => resolve(req.result || null);
+      req.onerror = () => reject(req.error);
+    });
+  }
+
+  async getUserByUsername(username) {
+    const all = await this.getAllUsers();
+    return all.find((u) => (u.username || '').toLowerCase() === (username || '').toLowerCase()) || null;
+  }
+
+  async saveUser(user) {
+    if (!user.id) {
+      user.id = 'user-' + Date.now() + '-' + Math.random().toString(36).substr(2, 6);
+    }
+    if (!user.createdAt) {
+      user.createdAt = new Date().toISOString().split('T')[0];
+    }
+    if (!user.permissions) {
+      user.permissions = {
+        canEditGrado1: false,
+        canEditGrado2: false,
+        canEditGrado3: false,
+        canManageEvents: false,
+        canManageUsers: false
+      };
+    }
+
+    // Proteger al superadmin root
+    if (user.username === 'josue958') {
+      user.isSuperAdmin = true;
+      user.permissions.canEditGrado1 = true;
+      user.permissions.canEditGrado2 = true;
+      user.permissions.canEditGrado3 = true;
+      user.permissions.canManageEvents = true;
+      user.permissions.canManageUsers = true;
+    }
+
+    if (!this.isIndexedDBReady) {
+      const all = JSON.parse(localStorage.getItem(STORAGE_USERS_KEY) || '[]');
+      const index = all.findIndex((u) => u.id === user.id);
+      if (index >= 0) all[index] = user;
+      else all.push(user);
+      localStorage.setItem(STORAGE_USERS_KEY, JSON.stringify(all));
+      return user;
+    }
+
+    return new Promise((resolve, reject) => {
+      const tx = this.db.transaction([STORE_USERS], 'readwrite');
+      const store = tx.objectStore(STORE_USERS);
+      const req = store.put(user);
+      req.onsuccess = () => resolve(user);
+      req.onerror = () => reject(req.error);
+    });
+  }
+
+  async deleteUser(id) {
+    const user = await this.getUserById(id);
+    if (user && user.username === 'josue958') {
+      throw new Error('El usuario administrador principal no puede ser eliminado.');
+    }
+
+    if (!this.isIndexedDBReady) {
+      let all = JSON.parse(localStorage.getItem(STORAGE_USERS_KEY) || '[]');
+      all = all.filter((u) => u.id !== id);
+      localStorage.setItem(STORAGE_USERS_KEY, JSON.stringify(all));
+      return true;
+    }
+
+    return new Promise((resolve, reject) => {
+      const tx = this.db.transaction([STORE_USERS], 'readwrite');
+      const store = tx.objectStore(STORE_USERS);
+      const req = store.delete(id);
+      req.onsuccess = () => resolve(true);
+      req.onerror = () => reject(req.error);
+    });
+  }
+
+  // ==========================================================================
+  // EXPORTACIÓN, IMPORTACIÓN Y RESETEO
+  // ==========================================================================
+
   async exportJSON() {
-    const data = await this.getAllBlocks();
-    return JSON.stringify(data, null, 2);
+    const blocks = await this.getAllBlocks();
+    const events = await this.getAllEvents();
+    const users = await this.getAllUsers();
+    return JSON.stringify({ blocks, events, users, version: DB_VERSION }, null, 2);
   }
 
   async importJSON(jsonString) {
     try {
       const parsed = JSON.parse(jsonString);
-      if (!Array.isArray(parsed)) throw new Error('El archivo JSON debe contener un arreglo de bloques.');
+      let blocks = [];
+      let events = INITIAL_EVENTS;
+      let users = INITIAL_USERS;
 
-      if (!this.isIndexedDBReady) {
-        localStorage.setItem(this.storageKey, JSON.stringify(parsed));
-        return true;
+      if (Array.isArray(parsed)) {
+        blocks = parsed;
+      } else if (parsed && typeof parsed === 'object') {
+        blocks = parsed.blocks || [];
+        if (parsed.events) events = parsed.events;
+        if (parsed.users) users = parsed.users;
       }
 
-      return new Promise((resolve, reject) => {
-        const tx = this.db.transaction([STORE_NAME], 'readwrite');
-        const store = tx.objectStore(STORE_NAME);
-        store.clear();
-        for (const item of parsed) {
-          store.put(item);
-        }
-        tx.oncomplete = () => {
-          this._syncToLocalStorageBackup();
-          resolve(true);
-        };
-        tx.onerror = () => reject(tx.error);
-      });
+      if (this.isIndexedDBReady) {
+        const tx = this.db.transaction([STORE_NAME, STORE_EVENTS, STORE_USERS], 'readwrite');
+        const sBlocks = tx.objectStore(STORE_NAME);
+        const sEvents = tx.objectStore(STORE_EVENTS);
+        const sUsers = tx.objectStore(STORE_USERS);
+
+        sBlocks.clear();
+        for (const b of blocks) sBlocks.put(b);
+
+        sEvents.clear();
+        for (const e of events) sEvents.put(e);
+
+        sUsers.clear();
+        for (const u of users) sUsers.put(u);
+
+        await new Promise((resolve, reject) => {
+          tx.oncomplete = () => resolve();
+          tx.onerror = () => reject(tx.error);
+        });
+      } else {
+        localStorage.setItem(STORAGE_BLOCKS_KEY, JSON.stringify(blocks));
+        localStorage.setItem(STORAGE_EVENTS_KEY, JSON.stringify(events));
+        localStorage.setItem(STORAGE_USERS_KEY, JSON.stringify(users));
+      }
+
+      return true;
     } catch (err) {
       console.error('Error importando datos:', err);
       throw err;
@@ -483,34 +811,31 @@ class EST54Database {
   }
 
   async resetDefault() {
-    if (!this.isIndexedDBReady) {
-      localStorage.setItem(this.storageKey, JSON.stringify(INITIAL_DATA));
-      return true;
-    }
+    if (this.isIndexedDBReady) {
+      const tx = this.db.transaction([STORE_NAME, STORE_EVENTS, STORE_USERS], 'readwrite');
+      const sBlocks = tx.objectStore(STORE_NAME);
+      const sEvents = tx.objectStore(STORE_EVENTS);
+      const sUsers = tx.objectStore(STORE_USERS);
 
-    return new Promise((resolve, reject) => {
-      const tx = this.db.transaction([STORE_NAME], 'readwrite');
-      const store = tx.objectStore(STORE_NAME);
-      store.clear();
-      for (const item of INITIAL_DATA) {
-        store.put(item);
-      }
-      tx.oncomplete = () => {
-        this._syncToLocalStorageBackup();
-        resolve(true);
-      };
-      tx.onerror = () => reject(tx.error);
-    });
-  }
+      sBlocks.clear();
+      for (const b of INITIAL_DATA) sBlocks.put(b);
 
-  async _syncToLocalStorageBackup() {
-    try {
-      const data = await this.getAllBlocks();
-      localStorage.setItem(this.storageKey, JSON.stringify(data));
-    } catch (e) {
-      // LocalStorage puede llenarse si hay archivos muy grandes; IndexedDB seguirá funcionando normalmente
-      console.warn('Backup local storage lleno o restringido');
+      sEvents.clear();
+      for (const e of INITIAL_EVENTS) sEvents.put(e);
+
+      sUsers.clear();
+      for (const u of INITIAL_USERS) sUsers.put(u);
+
+      await new Promise((resolve, reject) => {
+        tx.oncomplete = () => resolve();
+        tx.onerror = () => reject(tx.error);
+      });
+    } else {
+      localStorage.setItem(STORAGE_BLOCKS_KEY, JSON.stringify(INITIAL_DATA));
+      localStorage.setItem(STORAGE_EVENTS_KEY, JSON.stringify(INITIAL_EVENTS));
+      localStorage.setItem(STORAGE_USERS_KEY, JSON.stringify(INITIAL_USERS));
     }
+    return true;
   }
 }
 

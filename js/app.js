@@ -1,44 +1,71 @@
 /**
- * EST 54 EduHub - Lógica Principal de la Aplicación
+ * EST 54 EduHub - Lógica Principal de la Aplicación (v2)
  * Inspirada en el diseño y experiencia de Quizlet (quizlet.com/latest)
  * Soporte para 3 Grados, filtro por Materias, Drag & Drop WordPress-style,
- * Gestión de Artículos, Archivos e Imágenes, y Modo Estudio de Fichas.
+ * Gestión de Artículos, Archivos e Imágenes, Fichas de Estudio,
+ * Publicación de Eventos Escolares con Difusión en Redes Sociales (FB, IG, TikTok),
+ * y Panel de Administración CRUD de Usuarios y Permisos de Edición.
  */
 
 document.addEventListener('DOMContentLoaded', async () => {
   // Inicializar Base de Datos y Autenticación
   await window.est54DB.init();
-  window.est54Auth.init();
+  await window.est54Auth.init();
 
   const App = {
+    activeTab: 'grado', // 'grado', 'eventos', 'usuarios'
     currentGrado: '1',
     currentMateria: 'all',
     searchQuery: '',
     blocks: [],
+    events: [],
+    users: [],
     studySet: null,
     currentCardIndex: 0,
     isCardFlipped: false,
     draggedElement: null,
+    currentShareEvent: null,
 
     async init() {
       this.bindEvents();
       this.initTheme();
       await this.loadBlocks();
+      await this.loadEvents();
+      if (window.est54Auth.canManageUsers()) {
+        await this.loadUsers();
+      }
+      this.updateUIPermissions();
     },
 
     bindEvents() {
-      // Cambio de Grado (1°, 2°, 3°)
-      const gradoTabs = document.querySelectorAll('.grado-tab');
-      gradoTabs.forEach((tab) => {
+      // 1. Navegación Principal de Pestañas (Grados, Eventos, Usuarios)
+      const navTabs = document.querySelectorAll('.nav-main-tab');
+      navTabs.forEach((tab) => {
         tab.addEventListener('click', (e) => {
           e.preventDefault();
-          const grado = tab.dataset.grado;
-          if (grado && grado !== this.currentGrado) {
-            gradoTabs.forEach((t) => t.classList.remove('active'));
-            tab.classList.add('active');
-            this.currentGrado = grado;
+          const tabType = tab.dataset.tab;
+
+          navTabs.forEach((t) => t.classList.remove('active'));
+          tab.classList.add('active');
+
+          if (tabType === 'grado') {
+            this.activeTab = 'grado';
+            this.currentGrado = tab.dataset.grado || '1';
             this.currentMateria = 'all';
+            this.switchView('view-study');
             this.loadBlocks();
+          } else if (tabType === 'eventos') {
+            this.activeTab = 'eventos';
+            this.switchView('view-events');
+            this.loadEvents();
+          } else if (tabType === 'usuarios') {
+            if (!window.est54Auth.canManageUsers()) {
+              this.showToast('No tienes permisos para administrar usuarios', 'warning');
+              return;
+            }
+            this.activeTab = 'usuarios';
+            this.switchView('view-users');
+            this.loadUsers();
           }
         });
       });
@@ -48,7 +75,11 @@ document.addEventListener('DOMContentLoaded', async () => {
       if (searchInput) {
         searchInput.addEventListener('input', (e) => {
           this.searchQuery = e.target.value.toLowerCase().trim();
-          this.renderBlocks();
+          if (this.activeTab === 'grado') {
+            this.renderBlocks();
+          } else if (this.activeTab === 'eventos') {
+            this.renderEvents();
+          }
         });
       }
 
@@ -70,20 +101,25 @@ document.addEventListener('DOMContentLoaded', async () => {
       }
 
       if (authForm) {
-        authForm.addEventListener('submit', (e) => {
+        authForm.addEventListener('submit', async (e) => {
           e.preventDefault();
           const user = document.getElementById('login-username').value;
           const pass = document.getElementById('login-password').value;
           const remember = document.getElementById('login-remember').checked;
           const errorMsg = document.getElementById('login-error-msg');
 
-          const result = window.est54Auth.login(user, pass, remember);
+          const result = await window.est54Auth.login(user, pass, remember);
           if (result.success) {
             authModal.classList.remove('open');
             authForm.reset();
             errorMsg.textContent = '';
             this.showToast(result.message, 'success');
+            this.updateUIPermissions();
             this.renderBlocks();
+            this.renderEvents();
+            if (window.est54Auth.canManageUsers()) {
+              await this.loadUsers();
+            }
           } else {
             errorMsg.textContent = result.message;
           }
@@ -96,8 +132,14 @@ document.addEventListener('DOMContentLoaded', async () => {
         btnLogout.addEventListener('click', (e) => {
           e.preventDefault();
           window.est54Auth.logout();
-          this.showToast('Sesión de administrador cerrada', 'info');
+          this.showToast('Sesión cerrada con éxito', 'info');
+          // Si estaba en pestaña de usuarios, volver a 1° grado
+          if (this.activeTab === 'usuarios') {
+            document.getElementById('tab-grado-1')?.click();
+          }
+          this.updateUIPermissions();
           this.renderBlocks();
+          this.renderEvents();
         });
       }
 
@@ -106,10 +148,12 @@ document.addEventListener('DOMContentLoaded', async () => {
       if (btnTogglePreview) {
         btnTogglePreview.addEventListener('click', () => {
           window.est54Auth.toggleStudentPreview();
+          this.updateUIPermissions();
           this.renderBlocks();
+          this.renderEvents();
           const isPreview = window.est54Auth.previewAsStudent;
           this.showToast(
-            isPreview ? 'Modo de vista previa para alumnos activado' : 'Modo edición de administrador reactivado',
+            isPreview ? 'Modo de vista previa para alumnos activado' : 'Modo edición reactivado',
             'info'
           );
         });
@@ -117,14 +161,32 @@ document.addEventListener('DOMContentLoaded', async () => {
 
       // Evento de cambio de Auth
       window.addEventListener('auth:change', () => {
+        this.updateUIPermissions();
         this.renderBlocks();
+        this.renderEvents();
       });
 
-      // Botón Crear Bloque (Gutenberg / WordPress style)
+      // Botón Crear Bloque de Estudio (Gutenberg / WordPress style)
       const btnCreateBlock = document.getElementById('btn-create-block');
       if (btnCreateBlock) {
         btnCreateBlock.addEventListener('click', () => {
           this.openBlockEditor();
+        });
+      }
+
+      // Botón Crear Evento Escolar
+      const btnCreateEvent = document.getElementById('btn-create-event');
+      if (btnCreateEvent) {
+        btnCreateEvent.addEventListener('click', () => {
+          this.openEventModal();
+        });
+      }
+
+      // Botón Crear Usuario (CRUD)
+      const btnCreateUser = document.getElementById('btn-create-user');
+      if (btnCreateUser) {
+        btnCreateUser.addEventListener('click', () => {
+          this.openUserModal();
         });
       }
 
@@ -144,6 +206,86 @@ document.addEventListener('DOMContentLoaded', async () => {
         });
       }
 
+      // Formulario de Eventos
+      const eventForm = document.getElementById('event-editor-form');
+      if (eventForm) {
+        eventForm.addEventListener('submit', async (e) => {
+          e.preventDefault();
+          await this.handleSaveEvent();
+        });
+      }
+
+      // Subida de imagen para Eventos (archivo local)
+      const eventImgPicker = document.getElementById('event-image-file');
+      if (eventImgPicker) {
+        eventImgPicker.addEventListener('change', (e) => {
+          const file = e.target.files[0];
+          if (file) {
+            const reader = new FileReader();
+            reader.onload = (evt) => {
+              const urlInput = document.getElementById('event-image-url');
+              const previewBox = document.getElementById('event-image-preview-wrap');
+              const previewImg = document.getElementById('event-image-preview');
+              if (urlInput) urlInput.value = evt.target.result;
+              if (previewImg) previewImg.src = evt.target.result;
+              if (previewBox) previewBox.style.display = 'block';
+            };
+            reader.readAsDataURL(file);
+          }
+        });
+      }
+
+      // URL de imagen para Eventos
+      const eventImgUrlInput = document.getElementById('event-image-url');
+      if (eventImgUrlInput) {
+        eventImgUrlInput.addEventListener('input', () => {
+          const previewBox = document.getElementById('event-image-preview-wrap');
+          const previewImg = document.getElementById('event-image-preview');
+          if (eventImgUrlInput.value) {
+            previewImg.src = eventImgUrlInput.value;
+            previewBox.style.display = 'block';
+          } else {
+            previewBox.style.display = 'none';
+          }
+        });
+      }
+
+      // Cerrar modal de eventos
+      const closeEventModal = document.getElementById('close-event-editor-modal');
+      if (closeEventModal) {
+        closeEventModal.addEventListener('click', () => {
+          document.getElementById('event-editor-modal').classList.remove('open');
+        });
+      }
+
+      // Formulario de Usuarios (CRUD)
+      const userForm = document.getElementById('user-editor-form');
+      if (userForm) {
+        userForm.addEventListener('submit', async (e) => {
+          e.preventDefault();
+          await this.handleSaveUser();
+        });
+      }
+
+      // Cerrar modal de usuarios
+      const closeUserModal = document.getElementById('close-user-editor-modal');
+      if (closeUserModal) {
+        closeUserModal.addEventListener('click', () => {
+          document.getElementById('user-editor-modal').classList.remove('open');
+        });
+      }
+
+      // Cerrar modal de compartir redes sociales
+      const closeSocialModal = document.getElementById('close-social-share-modal');
+      if (closeSocialModal) {
+        closeSocialModal.addEventListener('click', () => {
+          document.getElementById('social-share-modal').classList.remove('open');
+        });
+      }
+
+      // Botones directos de compartir redes sociales
+      this.bindSocialShareButtons();
+
       // Cerrar modales con clic en backdrop o Escape
       window.addEventListener('keydown', (e) => {
         if (e.key === 'Escape') {
@@ -155,6 +297,32 @@ document.addEventListener('DOMContentLoaded', async () => {
           if (e.target === overlay) overlay.classList.remove('open');
         });
       });
+    },
+
+    switchView(viewId) {
+      document.querySelectorAll('.tab-view').forEach((v) => {
+        v.style.display = 'none';
+        v.classList.remove('active');
+      });
+      const target = document.getElementById(viewId);
+      if (target) {
+        target.style.display = 'block';
+        target.classList.add('active');
+      }
+    },
+
+    updateUIPermissions() {
+      const canManageEvents = window.est54Auth.canManageEvents();
+      const canManageUsers = window.est54Auth.canManageUsers();
+      const tabUsers = document.getElementById('tab-usuarios');
+      const btnCreateEvent = document.getElementById('btn-create-event');
+
+      if (tabUsers) {
+        tabUsers.style.display = canManageUsers ? 'inline-flex' : 'none';
+      }
+      if (btnCreateEvent) {
+        btnCreateEvent.style.display = canManageEvents ? 'inline-flex' : 'none';
+      }
     },
 
     initTheme() {
@@ -181,6 +349,10 @@ document.addEventListener('DOMContentLoaded', async () => {
       }
     },
 
+    // ==========================================================================
+    // SECCIÓN 1: BLOQUES DE ESTUDIO (1°, 2°, 3° GRADO)
+    // ==========================================================================
+
     async loadBlocks() {
       this.blocks = await window.est54DB.getBlocksByGrado(this.currentGrado);
       this.renderMateriaFilters();
@@ -191,7 +363,6 @@ document.addEventListener('DOMContentLoaded', async () => {
       const container = document.getElementById('materias-filter-container');
       if (!container) return;
 
-      // Extraer materias únicas del grado actual
       const materias = Array.from(new Set(this.blocks.map((b) => b.materia).filter(Boolean)));
 
       let html = `
@@ -213,7 +384,6 @@ document.addEventListener('DOMContentLoaded', async () => {
 
       container.innerHTML = html;
 
-      // Vincular eventos de clic a las etiquetas
       container.querySelectorAll('.materia-chip').forEach((chip) => {
         chip.addEventListener('click', () => {
           this.currentMateria = chip.dataset.materia;
@@ -225,7 +395,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     },
 
     getMateriaIcon(materia) {
-      const m = materia.toLowerCase();
+      const m = (materia || '').toLowerCase();
       if (m.includes('matemática')) return '📐';
       if (m.includes('español') || m.includes('lengua')) return '📖';
       if (m.includes('biología') || m.includes('ciencias')) return '🧬';
@@ -243,9 +413,9 @@ document.addEventListener('DOMContentLoaded', async () => {
       const emptyState = document.getElementById('empty-state');
       if (!grid) return;
 
-      const isAdmin = window.est54Auth.isAdmin();
+      // Verificar si el usuario autenticado tiene permiso de edición en este grado
+      const canEditCurrentGrade = window.est54Auth.canEditGrado(this.currentGrado);
 
-      // Filtrado por materia y texto de búsqueda
       let filtered = this.blocks.filter((b) => {
         const matchesMateria = this.currentMateria === 'all' || b.materia === this.currentMateria;
         if (!matchesMateria) return false;
@@ -271,18 +441,17 @@ document.addEventListener('DOMContentLoaded', async () => {
 
       if (emptyState) emptyState.style.display = 'none';
 
-      grid.innerHTML = filtered.map((block) => this.createBlockCardHtml(block, isAdmin)).join('');
+      grid.innerHTML = filtered.map((block) => this.createBlockCardHtml(block, canEditCurrentGrade)).join('');
 
-      // Asignar eventos de drag & drop si es administrador
-      if (isAdmin && this.currentMateria === 'all' && !this.searchQuery) {
+      // Drag & drop solo si tiene permisos en este grado
+      if (canEditCurrentGrade && this.currentMateria === 'all' && !this.searchQuery) {
         this.setupDragAndDrop(grid);
       }
 
-      // Vincular botones de acciones de tarjetas
       this.attachCardActions(grid);
     },
 
-    createBlockCardHtml(block, isAdmin) {
+    createBlockCardHtml(block, canEdit) {
       const typeIcons = {
         flashcards: `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18"/><path d="M9 21V9"/></svg>`,
         article: `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>`,
@@ -348,8 +517,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         `;
       }
 
-      // Controles exclusivos para Administrador
-      const adminControlsHtml = isAdmin
+      const adminControlsHtml = canEdit
         ? `
         <div class="admin-card-actions">
           <div class="drag-handle" title="Arrastra para reordenar este bloque (WordPress-style)">
@@ -373,7 +541,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         : '';
 
       return `
-        <article class="quizlet-card ${isAdmin ? 'is-draggable-card' : ''}" data-id="${block.id}" ${isAdmin ? 'draggable="true"' : ''}>
+        <article class="quizlet-card ${canEdit ? 'is-draggable-card' : ''}" data-id="${block.id}" ${canEdit ? 'draggable="true"' : ''}>
           ${adminControlsHtml}
           <div class="card-inner">
             <div class="card-top-meta">
@@ -456,14 +624,12 @@ document.addEventListener('DOMContentLoaded', async () => {
             el.classList.remove('drag-over-top', 'drag-over-bottom');
           });
 
-          // Obtener nuevo orden de IDs en el DOM
           const currentDomCards = Array.from(grid.querySelectorAll('.quizlet-card'));
           const orderedIds = currentDomCards.map((c) => c.dataset.id);
 
           await window.est54DB.updateOrder(orderedIds);
-          // Refrescar lista de bloques en memoria
           this.blocks = await window.est54DB.getBlocksByGrado(this.currentGrado);
-          this.showToast('Nuevo orden guardado automáticamente en la base de datos', 'success');
+          this.showToast('Nuevo orden guardado automáticamente', 'success');
         });
 
         card.addEventListener('dragover', (e) => {
@@ -505,7 +671,501 @@ document.addEventListener('DOMContentLoaded', async () => {
       });
     },
 
-    // --- MODAL MODO ESTUDIO DE FICHAS (TIPO QUIZLET) ---
+    // ==========================================================================
+    // SECCIÓN 2: EVENTOS ESCOLARES Y DIFUSIÓN EN REDES SOCIALES
+    // ==========================================================================
+
+    async loadEvents() {
+      this.events = await window.est54DB.getAllEvents();
+      this.renderEvents();
+    },
+
+    renderEvents() {
+      const grid = document.getElementById('events-grid');
+      const emptyState = document.getElementById('empty-events-state');
+      if (!grid) return;
+
+      const canManageEvents = window.est54Auth.canManageEvents();
+
+      let filtered = this.events;
+      if (this.searchQuery) {
+        const q = this.searchQuery;
+        filtered = filtered.filter(
+          (e) =>
+            (e.title || '').toLowerCase().includes(q) ||
+            (e.description || '').toLowerCase().includes(q) ||
+            (e.tags || '').toLowerCase().includes(q)
+        );
+      }
+
+      if (filtered.length === 0) {
+        grid.innerHTML = '';
+        if (emptyState) emptyState.style.display = 'flex';
+        return;
+      }
+
+      if (emptyState) emptyState.style.display = 'none';
+
+      grid.innerHTML = filtered.map((ev) => this.createEventCardHtml(ev, canManageEvents)).join('');
+
+      // Vincular botones de eventos
+      this.attachEventActions(grid);
+    },
+
+    createEventCardHtml(event, canManage) {
+      const adminActions = canManage
+        ? `
+        <div class="admin-btn-group" style="margin-left: auto;">
+          <button class="btn-admin-icon" data-event-action="edit" data-id="${event.id}" title="Editar evento">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+          </button>
+          <button class="btn-admin-icon btn-admin-danger" data-event-action="delete" data-id="${event.id}" title="Eliminar evento">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
+          </button>
+        </div>
+      `
+        : '';
+
+      const tagsArray = (event.tags || '')
+        .split(',')
+        .map((t) => t.trim().replace(/^#/, ''))
+        .filter(Boolean);
+
+      return `
+        <article class="event-card" data-id="${event.id}">
+          <div class="event-img-wrap">
+            <img src="${this.escapeHtml(event.imageUrl || 'https://images.unsplash.com/photo-1564981797816-1043664bf78d?auto=format&fit=crop&w=1200&q=80')}" alt="${this.escapeHtml(event.title)}" loading="lazy" />
+            <span class="event-badge-pill">${this.escapeHtml(event.badge || 'Evento')}</span>
+          </div>
+          <div class="event-card-body">
+            <div class="event-meta-row">
+              <span class="event-date-tag">
+                📅 ${this.formatDate(event.date)} ${event.time ? '• ' + this.escapeHtml(event.time) : ''}
+              </span>
+              ${event.location ? `<span class="event-location-tag">📍 ${this.escapeHtml(event.location)}</span>` : ''}
+              ${adminActions}
+            </div>
+
+            <h3 class="event-title">${this.escapeHtml(event.title)}</h3>
+            <p class="event-desc">${this.escapeHtml(event.description)}</p>
+
+            ${
+              tagsArray.length > 0
+                ? `<div class="event-tags-row">
+                    ${tagsArray.map((t) => `<span class="event-tag-chip">#${this.escapeHtml(t)}</span>`).join('')}
+                   </div>`
+                : ''
+            }
+
+            <div class="event-social-strip">
+              <div class="social-btns-group">
+                <button class="btn-social-chip chip-fb" data-social-action="fb" data-id="${event.id}" title="Compartir en Facebook">
+                  f
+                </button>
+                <button class="btn-social-chip chip-ig" data-social-action="ig" data-id="${event.id}" title="Preparar para Instagram">
+                  📸
+                </button>
+                <button class="btn-social-chip chip-tiktok" data-social-action="tiktok" data-id="${event.id}" title="Preparar para TikTok">
+                  🎵
+                </button>
+              </div>
+
+              <button class="btn-open-share-modal" data-social-action="modal" data-id="${event.id}">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/></svg>
+                Difundir
+              </button>
+            </div>
+          </div>
+        </article>
+      `;
+    },
+
+    attachEventActions(container) {
+      container.querySelectorAll('[data-event-action]').forEach((btn) => {
+        btn.addEventListener('click', (e) => {
+          e.stopPropagation();
+          const action = btn.dataset.eventAction;
+          const id = btn.dataset.id;
+          const event = this.events.find((ev) => ev.id === id);
+          if (!event) return;
+
+          if (action === 'edit') this.openEventModal(event);
+          if (action === 'delete') this.confirmDeleteEvent(event);
+        });
+      });
+
+      container.querySelectorAll('[data-social-action]').forEach((btn) => {
+        btn.addEventListener('click', (e) => {
+          e.stopPropagation();
+          const id = btn.dataset.id;
+          const event = this.events.find((ev) => ev.id === id);
+          if (!event) return;
+
+          const action = btn.dataset.socialAction;
+          if (action === 'fb') this.shareDirectFacebook(event);
+          else if (action === 'ig' || action === 'tiktok' || action === 'modal') {
+            this.openSocialModal(event);
+          }
+        });
+      });
+    },
+
+    openEventModal(eventToEdit = null) {
+      const modal = document.getElementById('event-editor-modal');
+      const title = document.getElementById('event-editor-modal-title');
+      const form = document.getElementById('event-editor-form');
+
+      title.textContent = eventToEdit ? 'Editar Evento Escolar' : 'Publicar Nuevo Evento Escolar';
+      document.getElementById('event-id').value = eventToEdit ? eventToEdit.id : '';
+      document.getElementById('event-title').value = eventToEdit ? eventToEdit.title : '';
+      document.getElementById('event-badge').value = eventToEdit ? eventToEdit.badge : 'Institucional';
+      document.getElementById('event-date').value = eventToEdit ? eventToEdit.date : new Date().toISOString().split('T')[0];
+      document.getElementById('event-time').value = eventToEdit ? eventToEdit.time || '' : '09:00 AM - Patio Cívico';
+      document.getElementById('event-desc').value = eventToEdit ? eventToEdit.description : '';
+      document.getElementById('event-tags').value = eventToEdit ? eventToEdit.tags || '' : 'EST54, SecundariaTecnica, ComunidadEscolar';
+
+      const imgInput = document.getElementById('event-image-url');
+      const previewBox = document.getElementById('event-image-preview-wrap');
+      const previewImg = document.getElementById('event-image-preview');
+
+      imgInput.value = eventToEdit ? eventToEdit.imageUrl || '' : '';
+      if (imgInput.value) {
+        previewImg.src = imgInput.value;
+        previewBox.style.display = 'block';
+      } else {
+        previewBox.style.display = 'none';
+      }
+
+      modal.classList.add('open');
+    },
+
+    async handleSaveEvent() {
+      const id = document.getElementById('event-id').value;
+      const title = document.getElementById('event-title').value.trim();
+      const badge = document.getElementById('event-badge').value.trim() || 'Evento';
+      const date = document.getElementById('event-date').value;
+      const time = document.getElementById('event-time').value.trim();
+      const description = document.getElementById('event-desc').value.trim();
+      const tags = document.getElementById('event-tags').value.trim();
+      const imageUrl =
+        document.getElementById('event-image-url').value.trim() ||
+        'https://images.unsplash.com/photo-1564981797816-1043664bf78d?auto=format&fit=crop&w=1200&q=80';
+
+      if (!title || !description || !date) {
+        this.showToast('Por favor completa el título, fecha y descripción', 'warning');
+        return;
+      }
+
+      const event = {
+        id: id || undefined,
+        title,
+        badge,
+        date,
+        time,
+        description,
+        tags,
+        imageUrl,
+        author: window.est54Auth.currentUser?.displayName || 'EST 54',
+        createdAt: new Date().toISOString().split('T')[0]
+      };
+
+      await window.est54DB.saveEvent(event);
+      document.getElementById('event-editor-modal').classList.remove('open');
+      this.showToast(id ? 'Evento actualizado con éxito' : 'Evento publicado con éxito', 'success');
+      await this.loadEvents();
+    },
+
+    async confirmDeleteEvent(event) {
+      if (confirm(`¿Estás seguro de que deseas eliminar el evento "${event.title}"?`)) {
+        await window.est54DB.deleteEvent(event.id);
+        this.showToast(`Evento "${event.title}" eliminado`, 'info');
+        await this.loadEvents();
+      }
+    },
+
+    // --- DIFUSIÓN EN REDES SOCIALES ---
+    openSocialModal(event) {
+      this.currentShareEvent = event;
+      const modal = document.getElementById('social-share-modal');
+      const img = document.getElementById('social-share-preview-img');
+      const title = document.getElementById('social-share-preview-title');
+      const date = document.getElementById('social-share-preview-date');
+      const captionText = document.getElementById('social-share-caption-text');
+
+      img.src = event.imageUrl;
+      title.textContent = event.title;
+      date.textContent = `📅 ${this.formatDate(event.date)} • ${event.location || 'EST 54'}`;
+
+      // Formatear pie de foto para redes
+      const tagsFormatted = (event.tags || '')
+        .split(',')
+        .map((t) => '#' + t.trim().replace(/^#/, ''))
+        .filter(Boolean)
+        .join(' ');
+
+      const caption = `📢 ${event.title}\n\n${event.description}\n\n🗓️ Fecha: ${this.formatDate(event.date)} ${event.time ? '(' + event.time + ')' : ''}\n📍 Lugar: ${event.location || 'Escuela Secundaria Técnica 54 "Ignacio Ramírez"'}\n\n${tagsFormatted}\n#EST54 #SecundariaTecnica #EducacionTecnica`;
+
+      captionText.value = caption;
+      modal.classList.add('open');
+    },
+
+    bindSocialShareButtons() {
+      // 1. Facebook
+      const btnFb = document.getElementById('btn-share-facebook');
+      if (btnFb) {
+        btnFb.onclick = () => {
+          if (this.currentShareEvent) {
+            this.shareDirectFacebook(this.currentShareEvent);
+          }
+        };
+      }
+
+      // 2. Instagram
+      const btnIg = document.getElementById('btn-share-instagram');
+      if (btnIg) {
+        btnIg.onclick = () => {
+          this.copySocialCaptionAndAlert(
+            '¡Texto copiado para Instagram! Ahora puedes abrir Instagram y pegar el texto en tu publicación o historia.'
+          );
+          window.open('https://www.instagram.com/', '_blank');
+        };
+      }
+
+      // 3. TikTok
+      const btnTiktok = document.getElementById('btn-share-tiktok');
+      if (btnTiktok) {
+        btnTiktok.onclick = () => {
+          this.copySocialCaptionAndAlert(
+            '¡Texto copiado para TikTok! Ahora puedes abrir TikTok y pegar el pie de video.'
+          );
+          window.open('https://www.tiktok.com/upload', '_blank');
+        };
+      }
+
+      // 4. Compartir Nativo (Mobile / Desktop Web Share API)
+      const btnNative = document.getElementById('btn-share-native');
+      if (btnNative) {
+        btnNative.onclick = async () => {
+          if (!this.currentShareEvent) return;
+          const ev = this.currentShareEvent;
+          if (navigator.share) {
+            try {
+              await navigator.share({
+                title: ev.title,
+                text: `${ev.title} - Escuela Secundaria Técnica 54\n${ev.description}`,
+                url: window.location.href
+              });
+              this.showToast('Evento compartido exitosamente', 'success');
+            } catch (err) {
+              // Usuario canceló la compartición
+            }
+          } else {
+            this.copySocialCaptionAndAlert('Texto copiado al portapapeles para compartir');
+          }
+        };
+      }
+
+      // 5. Copiar Texto
+      const btnCopy = document.getElementById('btn-copy-social-caption');
+      if (btnCopy) {
+        btnCopy.onclick = () => {
+          this.copySocialCaptionAndAlert('¡Texto y hashtags copiados al portapapeles!');
+        };
+      }
+
+      // 6. Descargar Imagen del Evento
+      const btnDownloadImg = document.getElementById('btn-download-social-image');
+      if (btnDownloadImg) {
+        btnDownloadImg.onclick = () => {
+          if (!this.currentShareEvent) return;
+          const link = document.createElement('a');
+          link.href = this.currentShareEvent.imageUrl;
+          link.download = `Evento_EST54_${this.currentShareEvent.title.replace(/\s+/g, '_')}.jpg`;
+          link.target = '_blank';
+          document.body.appendChild(link);
+          link.click();
+          document.body.removeChild(link);
+          this.showToast('Descargando imagen del evento...', 'info');
+        };
+      }
+    },
+
+    shareDirectFacebook(event) {
+      const shareUrl = window.location.href;
+      const text = `${event.title} - ${event.description}`;
+      const fbUrl = `https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(shareUrl)}&quote=${encodeURIComponent(text)}`;
+      window.open(fbUrl, '_blank', 'width=620,height=580,toolbar=0,status=0');
+      this.showToast('Abriendo ventana de publicación en Facebook...', 'info');
+    },
+
+    copySocialCaptionAndAlert(message) {
+      const captionText = document.getElementById('social-share-caption-text');
+      if (captionText) {
+        captionText.select();
+        navigator.clipboard.writeText(captionText.value);
+        this.showToast(message, 'success');
+      }
+    },
+
+    // ==========================================================================
+    // SECCIÓN 3: ADMINISTRACIÓN CRUD DE USUARIOS Y PERMISOS
+    // ==========================================================================
+
+    async loadUsers() {
+      this.users = await window.est54DB.getAllUsers();
+      this.renderUsers();
+    },
+
+    renderUsers() {
+      const tbody = document.getElementById('users-table-body');
+      if (!tbody) return;
+
+      if (this.users.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="5" style="text-align: center; color: var(--text-secondary);">No hay usuarios registrados.</td></tr>`;
+        return;
+      }
+
+      tbody.innerHTML = this.users
+        .map((u) => {
+          const isRoot = u.username === 'josue958';
+          const perms = u.permissions || {};
+
+          let permsBadges = '';
+          if (u.isSuperAdmin) {
+            permsBadges = `<span class="badge-perm perm-super">★ Acceso Total (SuperAdmin)</span>`;
+          } else {
+            if (perms.canEditGrado1) permsBadges += `<span class="badge-perm perm-grado">1° Grado</span>`;
+            if (perms.canEditGrado2) permsBadges += `<span class="badge-perm perm-grado">2° Grado</span>`;
+            if (perms.canEditGrado3) permsBadges += `<span class="badge-perm perm-grado">3° Grado</span>`;
+            if (perms.canManageEvents) permsBadges += `<span class="badge-perm perm-events">Eventos y Redes</span>`;
+            if (perms.canManageUsers) permsBadges += `<span class="badge-perm perm-super">Gestión Usuarios</span>`;
+            if (!permsBadges) permsBadges = `<span style="font-size: 0.78rem; color: var(--text-muted);">Solo lectura</span>`;
+          }
+
+          return `
+          <tr>
+            <td><span class="user-username-badge">${this.escapeHtml(u.username)}</span></td>
+            <td><strong>${this.escapeHtml(u.displayName || u.username)}</strong></td>
+            <td>${this.escapeHtml(u.role || 'Docente')}</td>
+            <td>${permsBadges}</td>
+            <td style="text-align: right;">
+              <div class="admin-btn-group" style="justify-content: flex-end;">
+                <button class="btn-admin-icon" data-user-action="edit" data-id="${u.id}" title="Editar permisos o contraseña">
+                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+                </button>
+                ${
+                  !isRoot
+                    ? `<button class="btn-admin-icon btn-admin-danger" data-user-action="delete" data-id="${u.id}" title="Eliminar usuario">
+                         <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
+                       </button>`
+                    : `<span style="font-size: 0.75rem; color: var(--text-muted); padding: 4px 6px;">Protegido</span>`
+                }
+              </div>
+            </td>
+          </tr>
+        `;
+        })
+        .join('');
+
+      // Asignar eventos de edición y eliminación
+      tbody.querySelectorAll('[data-user-action]').forEach((btn) => {
+        btn.addEventListener('click', () => {
+          const action = btn.dataset.userAction;
+          const id = btn.dataset.id;
+          const user = this.users.find((u) => u.id === id);
+          if (!user) return;
+
+          if (action === 'edit') this.openUserModal(user);
+          if (action === 'delete') this.confirmDeleteUser(user);
+        });
+      });
+    },
+
+    openUserModal(userToEdit = null) {
+      const modal = document.getElementById('user-editor-modal');
+      const title = document.getElementById('user-editor-modal-title');
+      const userInput = document.getElementById('crud-user-username');
+
+      title.textContent = userToEdit ? 'Editar Usuario y Permisos' : 'Dar de Alta Nuevo Usuario';
+      document.getElementById('crud-user-id').value = userToEdit ? userToEdit.id : '';
+      document.getElementById('crud-user-displayname').value = userToEdit ? userToEdit.displayName : '';
+      userInput.value = userToEdit ? userToEdit.username : '';
+      document.getElementById('crud-user-password').value = userToEdit ? userToEdit.password : '';
+      document.getElementById('crud-user-role').value = userToEdit ? userToEdit.role : 'Docente de Asignatura';
+
+      // Prohibir cambiar username del root
+      userInput.disabled = !!(userToEdit && userToEdit.username === 'josue958');
+
+      const perms = userToEdit?.permissions || {};
+      document.getElementById('perm-grado-1').checked = !!perms.canEditGrado1 || !!userToEdit?.isSuperAdmin;
+      document.getElementById('perm-grado-2').checked = !!perms.canEditGrado2 || !!userToEdit?.isSuperAdmin;
+      document.getElementById('perm-grado-3').checked = !!perms.canEditGrado3 || !!userToEdit?.isSuperAdmin;
+      document.getElementById('perm-events').checked = !!perms.canManageEvents || !!userToEdit?.isSuperAdmin;
+      document.getElementById('perm-users').checked = !!perms.canManageUsers || !!userToEdit?.isSuperAdmin;
+
+      modal.classList.add('open');
+    },
+
+    async handleSaveUser() {
+      const id = document.getElementById('crud-user-id').value;
+      const displayName = document.getElementById('crud-user-displayname').value.trim();
+      const username = document.getElementById('crud-user-username').value.trim().toLowerCase();
+      const password = document.getElementById('crud-user-password').value.trim();
+      const role = document.getElementById('crud-user-role').value;
+
+      if (!displayName || !username || !password) {
+        this.showToast('Por favor completa todos los campos del usuario', 'warning');
+        return;
+      }
+
+      // Validar si el username ya está ocupado por otro usuario
+      const existing = await window.est54DB.getUserByUsername(username);
+      if (existing && existing.id !== id) {
+        this.showToast(`El usuario "${username}" ya está registrado`, 'warning');
+        return;
+      }
+
+      const permissions = {
+        canEditGrado1: document.getElementById('perm-grado-1').checked,
+        canEditGrado2: document.getElementById('perm-grado-2').checked,
+        canEditGrado3: document.getElementById('perm-grado-3').checked,
+        canManageEvents: document.getElementById('perm-events').checked,
+        canManageUsers: document.getElementById('perm-users').checked
+      };
+
+      const user = {
+        id: id || undefined,
+        displayName,
+        username,
+        password,
+        role,
+        permissions,
+        isSuperAdmin: username === 'josue958' || permissions.canManageUsers
+      };
+
+      await window.est54DB.saveUser(user);
+      document.getElementById('user-editor-modal').classList.remove('open');
+      this.showToast(id ? 'Usuario actualizado con éxito' : 'Usuario registrado con éxito', 'success');
+      await this.loadUsers();
+    },
+
+    async confirmDeleteUser(user) {
+      if (user.username === 'josue958') {
+        this.showToast('No es posible eliminar al Administrador principal', 'danger');
+        return;
+      }
+
+      if (confirm(`¿Estás seguro de que deseas eliminar al usuario "${user.displayName} (${user.username})"?`)) {
+        await window.est54DB.deleteUser(user.id);
+        this.showToast(`Usuario "${user.username}" eliminado`, 'info');
+        await this.loadUsers();
+      }
+    },
+
+    // ==========================================================================
+    // MODALES COMUNES Y COMPLEMENTOS (Fichas, Artículos, Base de Datos)
+    // ==========================================================================
+
     openStudyModal(block) {
       this.studySet = block;
       this.currentCardIndex = 0;
@@ -521,7 +1181,6 @@ document.addEventListener('DOMContentLoaded', async () => {
       this.updateStudyCardView();
       modal.classList.add('open');
 
-      // Teclado para estudiar como Quizlet (Espacio para voltear, Flechas para navegar)
       this._studyKeyHandler = (e) => {
         if (!modal.classList.contains('open')) return;
         if (e.key === ' ' || e.key === 'Spacebar') {
@@ -535,28 +1194,17 @@ document.addEventListener('DOMContentLoaded', async () => {
       };
       window.addEventListener('keydown', this._studyKeyHandler);
 
-      // Eventos de botones
       const btnFlip = document.getElementById('btn-flip-card');
       const cardInner = document.getElementById('interactive-flashcard');
       const btnPrev = document.getElementById('btn-prev-card');
       const btnNext = document.getElementById('btn-next-card');
       const btnShuffle = document.getElementById('btn-shuffle-cards');
 
-      if (cardInner) {
-        cardInner.onclick = () => this.flipCurrentCard();
-      }
-      if (btnFlip) {
-        btnFlip.onclick = () => this.flipCurrentCard();
-      }
-      if (btnPrev) {
-        btnPrev.onclick = () => this.prevStudyCard();
-      }
-      if (btnNext) {
-        btnNext.onclick = () => this.nextStudyCard();
-      }
-      if (btnShuffle) {
-        btnShuffle.onclick = () => this.shuffleCards();
-      }
+      if (cardInner) cardInner.onclick = () => this.flipCurrentCard();
+      if (btnFlip) btnFlip.onclick = () => this.flipCurrentCard();
+      if (btnPrev) btnPrev.onclick = () => this.prevStudyCard();
+      if (btnNext) btnNext.onclick = () => this.nextStudyCard();
+      if (btnShuffle) btnShuffle.onclick = () => this.shuffleCards();
 
       const closeBtn = document.getElementById('close-study-modal');
       if (closeBtn) {
@@ -571,11 +1219,8 @@ document.addEventListener('DOMContentLoaded', async () => {
       const card = document.getElementById('interactive-flashcard');
       if (!card) return;
       this.isCardFlipped = !this.isCardFlipped;
-      if (this.isCardFlipped) {
-        card.classList.add('is-flipped');
-      } else {
-        card.classList.remove('is-flipped');
-      }
+      if (this.isCardFlipped) card.classList.add('is-flipped');
+      else card.classList.remove('is-flipped');
     },
 
     nextStudyCard() {
@@ -643,7 +1288,6 @@ document.addEventListener('DOMContentLoaded', async () => {
       if (btnNext) btnNext.disabled = this.currentCardIndex === total - 1;
     },
 
-    // --- MODAL DE LECTURA DE ARTÍCULO ---
     openArticleModal(block) {
       const modal = document.getElementById('article-modal');
       const title = document.getElementById('article-modal-title');
@@ -663,7 +1307,6 @@ document.addEventListener('DOMContentLoaded', async () => {
       }
 
       modal.classList.add('open');
-
       const closeBtn = document.getElementById('close-article-modal');
       if (closeBtn) closeBtn.onclick = () => modal.classList.remove('open');
     },
@@ -671,24 +1314,17 @@ document.addEventListener('DOMContentLoaded', async () => {
     formatArticleMarkdown(text) {
       if (!text) return '';
       let escaped = this.escapeHtml(text);
-      // Cabeceras
       escaped = escaped.replace(/^### (.*$)/gim, '<h3>$1</h3>');
       escaped = escaped.replace(/^## (.*$)/gim, '<h2>$1</h2>');
       escaped = escaped.replace(/^# (.*$)/gim, '<h1>$1</h1>');
-      // Negritas
       escaped = escaped.replace(/\*\*(.*?)\*\*/gim, '<strong>$1</strong>');
-      // Citas
       escaped = escaped.replace(/^\> (.*$)/gim, '<blockquote>$1</blockquote>');
-      // Bloques de código
       escaped = escaped.replace(/```([\s\S]*?)```/gim, '<pre><code>$1</code></pre>');
-      // Listas
       escaped = escaped.replace(/^- (.*$)/gim, '<li>$1</li>');
-      // Saltos de línea
       escaped = escaped.replace(/\n\n/g, '<p></p>');
       return escaped;
     },
 
-    // --- DESCARGA DE RECURSOS ---
     downloadResource(block) {
       const link = document.createElement('a');
       link.href = block.downloadData || 'data:text/plain;charset=utf-8,' + encodeURIComponent(block.description);
@@ -699,7 +1335,6 @@ document.addEventListener('DOMContentLoaded', async () => {
       this.showToast(`Descargando "${link.download}"...`, 'success');
     },
 
-    // --- VISOR DE IMAGEN / INFOGRAFÍA ---
     openImageLightbox(block) {
       const modal = document.getElementById('image-modal');
       const img = document.getElementById('lightbox-img');
@@ -715,7 +1350,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       if (closeBtn) closeBtn.onclick = () => modal.classList.remove('open');
     },
 
-    // --- EDITOR DE BLOQUES (WORDPRESS / GUTENBERG STYLE) ---
+    // --- EDITOR DE BLOQUES ---
     openBlockEditor(blockToEdit = null) {
       const modal = document.getElementById('editor-modal');
       const titleEl = document.getElementById('editor-modal-title');
@@ -723,7 +1358,6 @@ document.addEventListener('DOMContentLoaded', async () => {
 
       titleEl.textContent = blockToEdit ? 'Editar Bloque de Contenido' : 'Crear Nuevo Bloque (WordPress Style)';
 
-      // Campos base
       document.getElementById('editor-block-id').value = blockToEdit ? blockToEdit.id : '';
       document.getElementById('editor-grado').value = blockToEdit ? blockToEdit.grado : this.currentGrado;
       document.getElementById('editor-materia').value = blockToEdit ? blockToEdit.materia : 'Matemáticas';
@@ -731,7 +1365,6 @@ document.addEventListener('DOMContentLoaded', async () => {
       document.getElementById('editor-desc').value = blockToEdit ? blockToEdit.description : '';
       document.getElementById('editor-badge').value = blockToEdit ? blockToEdit.badge : '';
 
-      // Tipo de Bloque
       const typeSelect = document.getElementById('editor-type');
       typeSelect.value = blockToEdit ? blockToEdit.type : 'article';
 
@@ -741,7 +1374,6 @@ document.addEventListener('DOMContentLoaded', async () => {
         this.updateEditorFieldsByType(typeSelect.value, blockToEdit);
       };
 
-      // Manejo de envío
       form.onsubmit = async (e) => {
         e.preventDefault();
         await this.handleSaveBlock(blockToEdit);
@@ -928,7 +1560,6 @@ document.addEventListener('DOMContentLoaded', async () => {
         btn.onclick = () => {
           if (container.children.length > 1) {
             btn.closest('.card-builder-row').remove();
-            // Re-enumerar
             container.querySelectorAll('.card-builder-row').forEach((row, idx) => {
               row.querySelector('.card-row-num').textContent = idx + 1;
             });
@@ -969,7 +1600,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             ? 'Recurso'
             : 'Infografía'),
         type,
-        author: 'Prof. Josué',
+        author: window.est54Auth.currentUser?.displayName || 'Prof. Josué',
         date: existingBlock?.date || new Date().toISOString().split('T')[0],
         order: existingBlock?.order !== undefined ? existingBlock.order : undefined
       };
@@ -983,9 +1614,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         rows.forEach((r) => {
           const term = r.querySelector('.card-term-input').value.trim();
           const def = r.querySelector('.card-def-input').value.trim();
-          if (term || def) {
-            block.cards.push({ term, def });
-          }
+          if (term || def) block.cards.push({ term, def });
         });
       } else if (type === 'resource') {
         block.fileName = document.getElementById('editor-file-name')?.value.trim() || 'Recurso_EST54.pdf';
@@ -1004,10 +1633,9 @@ document.addEventListener('DOMContentLoaded', async () => {
       document.getElementById('editor-modal').classList.remove('open');
       this.showToast(existingBlock ? 'Bloque actualizado con éxito' : 'Nuevo bloque agregado con éxito', 'success');
 
-      // Si se guardó en el grado actual, recargar; de lo contrario cambiar de pestaña
       if (this.currentGrado !== grado) {
         this.currentGrado = grado;
-        document.querySelectorAll('.grado-tab').forEach((t) => {
+        document.querySelectorAll('.nav-main-tab[data-tab="grado"]').forEach((t) => {
           t.classList.toggle('active', t.dataset.grado === grado);
         });
       }
@@ -1022,7 +1650,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       }
     },
 
-    // --- MODAL DE GESTIÓN DE BASE DE DATOS ---
+    // --- BASE DE DATOS ---
     openDbModal() {
       const modal = document.getElementById('db-modal');
       modal.classList.add('open');
@@ -1059,6 +1687,8 @@ document.addEventListener('DOMContentLoaded', async () => {
               this.showToast('Base de datos restaurada con éxito', 'success');
               modal.classList.remove('open');
               await this.loadBlocks();
+              await this.loadEvents();
+              if (window.est54Auth.canManageUsers()) await this.loadUsers();
             } catch (err) {
               this.showToast('Error al importar archivo JSON inválido', 'danger');
             }
@@ -1074,6 +1704,8 @@ document.addEventListener('DOMContentLoaded', async () => {
             this.showToast('Base de datos restablecida a los valores iniciales', 'info');
             modal.classList.remove('open');
             await this.loadBlocks();
+            await this.loadEvents();
+            if (window.est54Auth.canManageUsers()) await this.loadUsers();
           }
         };
       }
@@ -1094,10 +1726,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       `;
 
       toastContainer.appendChild(toast);
-      setTimeout(() => {
-        toast.classList.add('show');
-      }, 10);
-
+      setTimeout(() => toast.classList.add('show'), 10);
       setTimeout(() => {
         toast.classList.remove('show');
         setTimeout(() => toast.remove(), 300);

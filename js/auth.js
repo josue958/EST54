@@ -1,17 +1,10 @@
 /**
- * EST 54 EduHub - Sistema de Autenticación de Administrador
- * Credenciales de acceso administrativo:
- * Usuario: josue958
- * Contraseña: Yoshi985
+ * EST 54 EduHub - Sistema de Autenticación y Control de Permisos (v2)
+ * Soporta usuarios dinámicos desde la Base de Datos IndexedDB,
+ * Roles granulares por sección (1°, 2°, 3° Grado), Eventos y Gestión de Usuarios.
  */
 
 const AUTH_STORAGE_KEY = 'EST54_AUTH_SESSION';
-const VALID_CREDENTIALS = {
-  username: 'josue958',
-  password: 'Yoshi985',
-  displayName: 'Prof. Josué',
-  role: 'Administrador Escolar'
-};
 
 class EST54Auth {
   constructor() {
@@ -19,13 +12,20 @@ class EST54Auth {
     this.previewAsStudent = false;
   }
 
-  init() {
+  async init() {
     const saved = localStorage.getItem(AUTH_STORAGE_KEY) || sessionStorage.getItem(AUTH_STORAGE_KEY);
     if (saved) {
       try {
-        const user = JSON.parse(saved);
-        if (user && user.username === VALID_CREDENTIALS.username) {
-          this.currentUser = user;
+        const sessionUser = JSON.parse(saved);
+        // Validar si el usuario aún existe en la base de datos
+        if (sessionUser && sessionUser.username) {
+          const freshUser = await window.est54DB.getUserByUsername(sessionUser.username);
+          if (freshUser && freshUser.password === sessionUser.password) {
+            this.currentUser = freshUser;
+          } else if (sessionUser.username === 'josue958' && sessionUser.password === 'Yoshi985') {
+            // Fallback para superadmin
+            this.currentUser = sessionUser;
+          }
         }
       } catch (e) {
         this.currentUser = null;
@@ -34,17 +34,39 @@ class EST54Auth {
     this.updateUI();
   }
 
-  login(username, password, remember = true) {
+  async login(username, password, remember = true) {
     const cleanUser = (username || '').trim();
     const cleanPass = (password || '').trim();
 
-    if (cleanUser === VALID_CREDENTIALS.username && cleanPass === VALID_CREDENTIALS.password) {
-      this.currentUser = {
-        username: VALID_CREDENTIALS.username,
-        displayName: VALID_CREDENTIALS.displayName,
-        role: VALID_CREDENTIALS.role,
-        loggedAt: new Date().toISOString()
+    // 1. Intentar validar en la base de datos
+    let user = null;
+    try {
+      user = await window.est54DB.getUserByUsername(cleanUser);
+    } catch (e) {
+      console.warn('Error al buscar usuario en DB:', e);
+    }
+
+    // 2. Fallback de emergencia para el administrador inicial josue958
+    if (!user && cleanUser === 'josue958' && cleanPass === 'Yoshi985') {
+      user = {
+        id: 'user-admin-root',
+        username: 'josue958',
+        password: 'Yoshi985',
+        displayName: 'Prof. Josué',
+        role: 'Super Administrador',
+        isSuperAdmin: true,
+        permissions: {
+          canEditGrado1: true,
+          canEditGrado2: true,
+          canEditGrado3: true,
+          canManageEvents: true,
+          canManageUsers: true
+        }
       };
+    }
+
+    if (user && user.password === cleanPass) {
+      this.currentUser = user;
       this.previewAsStudent = false;
 
       const payload = JSON.stringify(this.currentUser);
@@ -56,7 +78,7 @@ class EST54Auth {
 
       this.updateUI();
       window.dispatchEvent(new CustomEvent('auth:change', { detail: { isAuthenticated: true, user: this.currentUser } }));
-      return { success: true, message: '¡Bienvenido, ' + VALID_CREDENTIALS.displayName + '!' };
+      return { success: true, message: `¡Bienvenido, ${user.displayName || user.username}!` };
     }
 
     return {
@@ -74,24 +96,53 @@ class EST54Auth {
     window.dispatchEvent(new CustomEvent('auth:change', { detail: { isAuthenticated: false, user: null } }));
   }
 
+  isLoggedIn() {
+    return !!this.currentUser;
+  }
+
+  // Verifica si el usuario actual tiene permisos de edición (y no está en vista previa de alumno)
   isAdmin() {
     return !!this.currentUser && !this.previewAsStudent;
   }
 
-  isLoggedIn() {
-    return !!this.currentUser;
+  // Permisos granulares
+  canEditGrado(grado) {
+    if (!this.isAdmin()) return false;
+    if (this.currentUser.isSuperAdmin) return true;
+    const perms = this.currentUser.permissions || {};
+    if (String(grado) === '1') return !!perms.canEditGrado1;
+    if (String(grado) === '2') return !!perms.canEditGrado2;
+    if (String(grado) === '3') return !!perms.canEditGrado3;
+    return false;
+  }
+
+  canManageEvents() {
+    if (!this.isAdmin()) return false;
+    if (this.currentUser.isSuperAdmin) return true;
+    return !!(this.currentUser.permissions && this.currentUser.permissions.canManageEvents);
+  }
+
+  canManageUsers() {
+    if (!this.isAdmin()) return false;
+    if (this.currentUser.isSuperAdmin) return true;
+    return !!(this.currentUser.permissions && this.currentUser.permissions.canManageUsers);
   }
 
   toggleStudentPreview() {
     if (!this.currentUser) return;
     this.previewAsStudent = !this.previewAsStudent;
     this.updateUI();
-    window.dispatchEvent(new CustomEvent('auth:change', { detail: { isAuthenticated: this.isAdmin(), preview: this.previewAsStudent } }));
+    window.dispatchEvent(
+      new CustomEvent('auth:change', {
+        detail: { isAuthenticated: this.isAdmin(), preview: this.previewAsStudent, user: this.currentUser }
+      })
+    );
   }
 
   updateUI() {
-    const isAdmin = this.isAdmin();
     const isLoggedIn = this.isLoggedIn();
+    const isAdmin = this.isAdmin();
+    const canUsers = this.canManageUsers();
 
     if (isAdmin) {
       document.body.classList.add('is-admin');
@@ -110,11 +161,24 @@ class EST54Auth {
     const adminMenu = document.getElementById('header-admin-menu');
     const adminBadge = document.getElementById('admin-badge-name');
     const previewToggleBtn = document.getElementById('btn-toggle-preview');
+    const btnCreateBlock = document.getElementById('btn-create-block');
+    const tabUsers = document.getElementById('tab-usuarios');
 
     if (loginBtn) loginBtn.style.display = isLoggedIn ? 'none' : 'inline-flex';
     if (adminMenu) adminMenu.style.display = isLoggedIn ? 'inline-flex' : 'none';
-    if (adminBadge) adminBadge.textContent = this.currentUser ? this.currentUser.displayName : '';
-    
+    if (adminBadge) adminBadge.textContent = this.currentUser ? this.currentUser.displayName || this.currentUser.username : '';
+
+    // Pestaña de Usuarios exclusiva para quien tiene permiso canManageUsers
+    if (tabUsers) {
+      tabUsers.style.display = canUsers ? 'inline-flex' : 'none';
+    }
+
+    if (btnCreateBlock) {
+      // Mostrar botón de crear bloque si tiene algún permiso de edición
+      const hasAnyEdit = this.canEditGrado('1') || this.canEditGrado('2') || this.canEditGrado('3');
+      btnCreateBlock.style.display = hasAnyEdit ? 'inline-flex' : 'none';
+    }
+
     if (previewToggleBtn) {
       if (this.previewAsStudent) {
         previewToggleBtn.innerHTML = `
@@ -125,7 +189,7 @@ class EST54Auth {
       } else {
         previewToggleBtn.innerHTML = `
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
-          <span>Vista de Estudiante</span>
+          <span>Vista Alumno</span>
         `;
         previewToggleBtn.classList.remove('active-preview');
       }
