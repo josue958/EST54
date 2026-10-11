@@ -1,19 +1,24 @@
 <!DOCTYPE html>
 <html lang="es" data-theme="light">
+
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <meta name="description" content="Plataforma de estudio y recursos académicos de la Escuela Secundaria Técnica 54. Fichas de estudio, artículos explicativos, guías descargables e imágenes interactivas organizadas por grado y materia." />
-  <meta name="keywords" content="EST 54, secundaria técnica, fichas de estudio, quizlet, materias, matemáticas, biología, física, química, recursos escolares" />
+  <meta name="description"
+    content="Plataforma de estudio y recursos académicos de la Escuela Secundaria Técnica 54. Fichas de estudio, artículos explicativos, guías descargables e imágenes interactivas organizadas por grado y materia." />
+  <meta name="keywords"
+    content="EST 54, secundaria técnica, fichas de estudio, quizlet, materias, matemáticas, biología, física, química, recursos escolares" />
   <meta name="author" content="Prof. Josué - EST 54" />
   <title>EST 54 EduHub | Plataforma de Recursos y Estudio</title>
-  
+
   <!-- Favicon SVG -->
-  <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>⚡</text></svg>">
-  
+  <link rel="icon"
+    href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>⚡</text></svg>">
+
   <!-- Estilos -->
   <link rel="stylesheet" href="css/styles.css" />
 </head>
+
 <body>
 
   <!-- ==========================================================================
@@ -21,7 +26,7 @@
        ========================================================================== -->
   <header class="quizlet-header" id="main-header">
     <div class="header-container">
-      
+
       <!-- Lado Izquierdo: Marca / Logo -->
       <div class="header-left">
         <div class="brand-logo" id="brand-logo" onclick="location.reload()">
@@ -30,7 +35,7 @@
             <span class="brand-name">
               EST 54 <span class="badge-tech">EduHub</span>
             </span>
-            <span class="brand-sub">Secundaria Técnica 54</span>
+            <span class="brand-sub">Escuela Secundaria Técnica 54</span>
           </div>
         </div>
       </div>
@@ -38,23 +43,19 @@
       <!-- Centro: Barra de Búsqueda en tiempo real -->
       <div class="header-search">
         <div class="search-wrapper">
-          <svg class="search-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
+          <svg class="search-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+            stroke-width="2.2">
             <circle cx="11" cy="11" r="8"></circle>
             <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
           </svg>
-          <input 
-            type="search" 
-            id="search-input" 
-            class="search-input" 
-            placeholder="Buscar fichas, resúmenes, fórmulas, materias..." 
-            aria-label="Buscar recursos de estudio"
-          />
+          <input type="search" id="search-input" class="search-input"
+            placeholder="Buscar fichas, resúmenes, fórmulas, materias..." aria-label="Buscar recursos de estudio" />
         </div>
       </div>
 
       <!-- Lado Derecho: Acciones, Modo Oscuro y Login/Admin -->
       <div class="header-right">
-        
+
         <!-- Botón Modo Oscuro / Claro -->
         <button class="btn-icon" id="btn-theme-toggle" title="Cambiar tema (Claro / Oscuro)" aria-label="Cambiar tema">
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -79,7 +80,8 @@
             <span id="admin-badge-name">Prof. Josué</span>
           </div>
 
-          <button class="btn-preview-toggle" id="btn-toggle-preview" title="Cambiar entre modo edición y vista de estudiante">
+          <button class="btn-preview-toggle" id="btn-toggle-preview"
+            title="Cambiar entre modo edición y vista de estudiante">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
               <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
               <circle cx="12" cy="12" r="3"></circle>
@@ -123,8 +125,8 @@
     <div class="hero-container">
       <div class="hero-headline">
         <div class="hero-title-group">
-          <h1>¿Qué quieres aprender o repasar hoy?</h1>
-          <p>Explora recursos académicos, fichas interactivas estilo Quizlet y materiales oficiales por grado.</p>
+          <h1>Escuela Secundaria Tecnica 54 "Ignacio Ramirez"</h1>
+          <p>Explora recursos académicos, fichas interactivas y materiales oficiales por grado.</p>
         </div>
       </div>
 
@@ -150,7 +152,7 @@
        CONTENIDO PRINCIPAL
        ========================================================================== -->
   <main class="main-wrapper" id="main-content">
-    
+
     <!-- Filtros Horizontales por Materia -->
     <section class="filter-section" aria-label="Filtro por materias">
       <div class="filter-header">
@@ -164,7 +166,7 @@
     <!-- Barra de Estado y Acciones Rápidas -->
     <div class="sub-bar-status">
       <span class="results-count-text" id="results-count">Cargando elementos...</span>
-      
+
       <div class="admin-quick-actions">
         <span style="font-size: 0.8rem; color: var(--text-secondary); font-weight: 600;">
           Modo Administrador: Puedes arrastrar para ordenar (Drag & Drop)
@@ -197,30 +199,19 @@
       </div>
       <div class="modal-body">
         <p style="font-size: 0.9rem; color: var(--text-secondary); margin-bottom: 20px;">
-          Solo el personal docente autorizado tiene permisos para agregar artículos, subir archivos, imágenes y reordenar bloques.
+          Solo el personal docente autorizado tiene permisos para agregar artículos, subir archivos, imágenes y
+          reordenar bloques.
         </p>
         <form id="auth-form">
           <div class="form-group">
             <label for="login-username">Usuario</label>
-            <input 
-              type="text" 
-              id="login-username" 
-              class="form-input" 
-              placeholder="Ingresa tu usuario" 
-              required 
-              autocomplete="username"
-            />
+            <input type="text" id="login-username" class="form-input" placeholder="Ingresa tu usuario" required
+              autocomplete="username" />
           </div>
           <div class="form-group">
             <label for="login-password">Contraseña</label>
-            <input 
-              type="password" 
-              id="login-password" 
-              class="form-input" 
-              placeholder="Ingresa tu contraseña" 
-              required 
-              autocomplete="current-password"
-            />
+            <input type="password" id="login-password" class="form-input" placeholder="Ingresa tu contraseña" required
+              autocomplete="current-password" />
           </div>
           <div class="form-group">
             <label class="checkbox-label">
@@ -229,7 +220,8 @@
             </label>
           </div>
           <div class="error-text" id="login-error-msg"></div>
-          <button type="submit" class="btn-primary-action" style="width: 100%; justify-content: center; margin-top: 10px; padding: 12px;">
+          <button type="submit" class="btn-primary-action"
+            style="width: 100%; justify-content: center; margin-top: 10px; padding: 12px;">
             Entrar como Administrador
           </button>
         </form>
@@ -251,7 +243,7 @@
       </div>
       <div class="modal-body">
         <div class="study-player-container">
-          
+
           <!-- Barra de Progreso -->
           <div class="study-progress-bar-wrap">
             <div class="study-progress-bar-fill" id="study-progress-fill"></div>
@@ -273,7 +265,10 @@
                 <span class="flashcard-badge-side">Término / Pregunta</span>
                 <div class="flashcard-content-center" id="flashcard-front-term">Término</div>
                 <span class="flashcard-tip-flip">
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 2v6h-6"/><path d="M3 12a9 9 0 0 1 15-6.7L21 8"/></svg>
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M21 2v6h-6" />
+                    <path d="M3 12a9 9 0 0 1 15-6.7L21 8" />
+                  </svg>
                   Toca para ver la definición
                 </span>
               </div>
@@ -282,7 +277,10 @@
                 <span class="flashcard-badge-side">Definición / Explicación</span>
                 <div class="flashcard-content-center" id="flashcard-back-def">Definición</div>
                 <span class="flashcard-tip-flip">
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 2v6h-6"/><path d="M3 12a9 9 0 0 1 15-6.7L21 8"/></svg>
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M21 2v6h-6" />
+                    <path d="M3 12a9 9 0 0 1 15-6.7L21 8" />
+                  </svg>
                   Toca para volver al término
                 </span>
               </div>
@@ -292,7 +290,9 @@
           <!-- Controles de Navegación del Estudio -->
           <div class="study-controls">
             <button class="btn-study-nav" id="btn-prev-card" title="Ficha anterior (Flecha izquierda)">
-              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="15 18 9 12 15 6"/></svg>
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+                <polyline points="15 18 9 12 15 6" />
+              </svg>
             </button>
 
             <button class="btn-flip-primary" id="btn-flip-card">
@@ -300,7 +300,9 @@
             </button>
 
             <button class="btn-study-nav" id="btn-next-card" title="Ficha siguiente (Flecha derecha)">
-              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="9 18 15 12 9 6"/></svg>
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+                <polyline points="9 18 15 12 9 6" />
+              </svg>
             </button>
           </div>
 
@@ -376,7 +378,8 @@
 
             <div class="form-group">
               <label for="editor-materia">Materia o Asignatura</label>
-              <input type="text" id="editor-materia" class="form-input" placeholder="ej. Matemáticas I, Física, Química, Español..." required />
+              <input type="text" id="editor-materia" class="form-input"
+                placeholder="ej. Matemáticas I, Física, Química, Español..." required />
             </div>
           </div>
 
@@ -393,7 +396,8 @@
 
             <div class="form-group">
               <label for="editor-badge">Etiqueta Personalizada</label>
-              <input type="text" id="editor-badge" class="form-input" placeholder="ej. Guía Maestra, Examen Próximo, Tarea..." />
+              <input type="text" id="editor-badge" class="form-input"
+                placeholder="ej. Guía Maestra, Examen Próximo, Tarea..." />
             </div>
           </div>
 
@@ -404,14 +408,16 @@
 
           <div class="form-group">
             <label for="editor-desc">Descripción Breve o Resumen</label>
-            <textarea id="editor-desc" class="form-textarea" rows="2" placeholder="Resumen que verán los alumnos antes de entrar"></textarea>
+            <textarea id="editor-desc" class="form-textarea" rows="2"
+              placeholder="Resumen que verán los alumnos antes de entrar"></textarea>
           </div>
 
           <!-- Campos dinámicos según el tipo de bloque seleccionado -->
           <div id="editor-dynamic-fields"></div>
 
           <div style="display: flex; justify-content: flex-end; gap: 12px; margin-top: 24px;">
-            <button type="button" class="btn-secondary-action" onclick="document.getElementById('editor-modal').classList.remove('open')">
+            <button type="button" class="btn-secondary-action"
+              onclick="document.getElementById('editor-modal').classList.remove('open')">
               Cancelar
             </button>
             <button type="submit" class="btn-primary-action">
@@ -434,21 +440,27 @@
       </div>
       <div class="modal-body">
         <p style="font-size: 0.9rem; color: var(--text-secondary); margin-bottom: 20px;">
-          Esta plataforma utiliza <strong>IndexedDB</strong> de alta capacidad directamente en el navegador del cliente, ideal para funcionar en <strong>GitHub Pages</strong> sin necesidad de servidores adicionales.
+          Esta plataforma utiliza <strong>IndexedDB</strong> de alta capacidad directamente en el navegador del cliente,
+          ideal para funcionar en <strong>GitHub Pages</strong> sin necesidad de servidores adicionales.
         </p>
 
         <div style="display: flex; flex-direction: column; gap: 14px;">
-          <div style="background: var(--bg-input); padding: 16px; border-radius: var(--radius-md); border: 1px solid var(--border-light);">
-            <strong style="display: block; font-size: 0.95rem; margin-bottom: 4px;">Copia de Seguridad (Exportar)</strong>
-            <p style="font-size: 0.82rem; color: var(--text-secondary); margin-bottom: 12px;">Descarga todos los bloques, materias, artículos y fichas en un archivo JSON.</p>
+          <div
+            style="background: var(--bg-input); padding: 16px; border-radius: var(--radius-md); border: 1px solid var(--border-light);">
+            <strong style="display: block; font-size: 0.95rem; margin-bottom: 4px;">Copia de Seguridad
+              (Exportar)</strong>
+            <p style="font-size: 0.82rem; color: var(--text-secondary); margin-bottom: 12px;">Descarga todos los
+              bloques, materias, artículos y fichas en un archivo JSON.</p>
             <button class="btn-secondary-action" id="btn-export-db">
               📥 Descargar Backup JSON
             </button>
           </div>
 
-          <div style="background: var(--bg-input); padding: 16px; border-radius: var(--radius-md); border: 1px solid var(--border-light);">
+          <div
+            style="background: var(--bg-input); padding: 16px; border-radius: var(--radius-md); border: 1px solid var(--border-light);">
             <strong style="display: block; font-size: 0.95rem; margin-bottom: 4px;">Restaurar Datos (Importar)</strong>
-            <p style="font-size: 0.82rem; color: var(--text-secondary); margin-bottom: 12px;">Carga un archivo de respaldo JSON generado previamente.</p>
+            <p style="font-size: 0.82rem; color: var(--text-secondary); margin-bottom: 12px;">Carga un archivo de
+              respaldo JSON generado previamente.</p>
             <input type="file" id="import-file-input" accept=".json" style="display: none;" />
             <button class="btn-secondary-action" id="btn-import-db">
               📤 Seleccionar Archivo JSON
@@ -456,8 +468,10 @@
           </div>
 
           <div style="background: #fff1f2; padding: 16px; border-radius: var(--radius-md); border: 1px solid #fecdd3;">
-            <strong style="display: block; font-size: 0.95rem; color: #9f1239; margin-bottom: 4px;">Restablecer Demostración</strong>
-            <p style="font-size: 0.82rem; color: #881337; margin-bottom: 12px;">Reinicia los contenidos a los valores iniciales de fábrica.</p>
+            <strong style="display: block; font-size: 0.95rem; color: #9f1239; margin-bottom: 4px;">Restablecer
+              Demostración</strong>
+            <p style="font-size: 0.82rem; color: #881337; margin-bottom: 12px;">Reinicia los contenidos a los valores
+              iniciales de fábrica.</p>
             <button class="btn-secondary-action" id="btn-reset-db" style="color: #9f1239; border-color: #fecdd3;">
               ⚠️ Restablecer Valores Iniciales
             </button>
@@ -492,4 +506,5 @@
   <script src="js/auth.js"></script>
   <script src="js/app.js"></script>
 </body>
+
 </html>
