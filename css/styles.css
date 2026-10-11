@@ -379,8 +379,32 @@ button, input, select, textarea {
 
 .hero-title-group {
   text-align: center;
-  max-width: 800px;
+  max-width: 950px;
   margin: 0 auto;
+}
+
+.hero-title-with-logo {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 18px;
+  margin-bottom: 4px;
+  flex-wrap: wrap;
+}
+
+.hero-school-logo {
+  width: 62px;
+  height: 62px;
+  object-fit: contain;
+  filter: drop-shadow(0 4px 10px rgba(46, 56, 86, 0.15));
+  transition: transform var(--transition-fast);
+  border-radius: var(--radius-sm);
+  background: #ffffff;
+  padding: 2px;
+}
+
+.hero-school-logo:hover {
+  transform: scale(1.08) rotate(-2deg);
 }
 
 .hero-title-group h1 {
