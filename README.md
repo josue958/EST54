@@ -22,18 +22,34 @@ Plataforma educativa inspirada en el diseño moderno de **[Quizlet](https://quiz
      - 🃏 **Set de Fichas de Estudio** (generador ilimitado de términos y definiciones).
      - 📁 **Recursos y Archivos Referentes** (subida de archivos reales con descarga directa en base64/blob).
      - 🖼️ **Imágenes e Infografías** (subida desde disco o URLs con visor modal).
-4. **Base de Datos para GitHub Pages**:
-   - Basada en **IndexedDB** del navegador del cliente (almacena grandes volúmenes de datos, fichas, imágenes y archivos sin el límite de 5MB de LocalStorage).
-   - Incluye respaldo y sincronización con LocalStorage como fallback.
+4. **Pestaña de Eventos y Difusión en Redes Sociales (Facebook, Instagram y TikTok)**:
+   - Publicación y edición de eventos escolares con fotos, fecha, hora, ubicación, descripción y hashtags.
+   - Botón directo para postear en **Facebook** (dialogo web nativo).
+   - Generador para **Instagram** y **TikTok** con copia de pie de foto con hashtags en un clic, descarga automática de foto optimizada y redirección a la app.
+   - Soporte para **Web Share API** en móviles para compartir directo a cualquier aplicación instalada.
+5. **Panel CRUD de Gestión de Usuarios y Permisos por Sección**:
+   - Pestaña exclusiva para administradores con permiso `canManageUsers`.
+   - Permite dar de alta nuevos docentes con su nombre, usuario y contraseña.
+   - **Permisos Granulares:** Selecciona con precisión si el usuario puede editar:
+     - 1° Grado
+     - 2° Grado
+     - 3° Grado
+     - Publicar y gestionar Eventos
+     - Administrar otros Usuarios (Super Administrador)
+   - Tabla interactiva para editar credenciales, modificar permisos y eliminar cuentas.
+6. **Base de Datos para GitHub Pages**:
+   - Basada en **IndexedDB (v2)** del navegador del cliente con tiendas para bloques, eventos y usuarios.
+   - Sincronización continua y respaldo en LocalStorage.
    - Herramienta de **Exportación e Importación JSON** para respaldar o transferir la base de datos completa.
    - Opción para restablecer datos semilla en cualquier momento.
-5. **Autenticación y Permisos**:
-   - **Visitantes / Alumnos**: Modo solo lectura. No pueden editar, mover ni borrar contenidos. Pueden interactuar con las fichas, leer artículos, ver imágenes y descargar guías.
-   - **Administrador**:
+7. **Autenticación y Roles**:
+   - **Visitantes / Alumnos**: Modo solo lectura en las 3 secciones de grados y en la sección de eventos.
+   - **Administrador Principal (Root)**:
      - **Usuario:** `josue958`
-     - **Contraseña:** `Yoshi985`
-     - Permite activar/desactivar el modo edición, arrastrar tarjetas, crear nuevos bloques, editar existentes, eliminar y gestionar la base de datos.
-     - Botón **"Vista Alumno"** para previsualizar el sitio exactamente como lo ven los estudiantes sin tener que cerrar sesión.
+     - **Contraseña:** `Yoshi985` (Super Administrador protegido con acceso total).
+   - **Docentes Secundarios de Ejemplo Precargados**:
+     - `prof_martha` (contraseña `Martha2026`): Solo puede editar 1° Grado.
+     - `difusion54` (contraseña `Difusion2026`): Solo puede publicar eventos y difusión.
 
 ---
 
