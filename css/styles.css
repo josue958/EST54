@@ -369,34 +369,42 @@ button, input, select, textarea {
 
 .hero-headline {
   display: flex;
-  justify-content: space-between;
-  align-items: flex-end;
+  justify-content: center;
+  align-items: center;
+  text-align: center;
   margin-bottom: 24px;
   flex-wrap: wrap;
   gap: 16px;
 }
 
+.hero-title-group {
+  text-align: center;
+  max-width: 800px;
+  margin: 0 auto;
+}
+
 .hero-title-group h1 {
-  font-size: 2rem;
+  font-size: 2.1rem;
   font-weight: 800;
   color: var(--text-main);
   letter-spacing: -0.5px;
-  line-height: 1.2;
+  line-height: 1.25;
 }
 
 .hero-title-group p {
   color: var(--text-secondary);
-  font-size: 1rem;
-  margin-top: 6px;
+  font-size: 1.05rem;
+  margin-top: 8px;
 }
 
-/* Barra de 3 Grados (Tabs Principales Requeridos) */
+/* Barra de 3 Grados (Tabs Principales Requeridos) Centrada */
 .grados-tab-bar {
   display: flex;
-  gap: 10px;
+  justify-content: center;
+  gap: 12px;
   border-bottom: 2px solid var(--border-light);
   padding-bottom: 0;
-  margin-top: 14px;
+  margin-top: 18px;
 }
 
 .grado-tab {
