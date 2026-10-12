@@ -752,12 +752,26 @@
         <button class="btn-modal-close" id="close-db-modal" aria-label="Cerrar">&times;</button>
       </div>
       <div class="modal-body">
+        <div style="background: rgba(16, 185, 129, 0.1); border: 1px solid rgba(16, 185, 129, 0.3); padding: 12px 16px; border-radius: var(--radius-md); margin-bottom: 16px; display: flex; align-items: center; gap: 10px;">
+          <span style="font-size: 1.3rem;">🔥</span>
+          <span style="font-size: 0.88rem; color: #047857; font-weight: 600;">
+            Conectado a Google Cloud Firestore (Firebase) • Sincronización multi-dispositivo activa
+          </span>
+        </div>
         <p style="font-size: 0.9rem; color: var(--text-secondary); margin-bottom: 20px;">
-          Esta plataforma utiliza <strong>IndexedDB</strong> de alta capacidad directamente en el navegador del cliente,
-          ideal para funcionar en <strong>GitHub Pages</strong> sin necesidad de servidores adicionales.
+          Todos los cambios que realices se guardan automáticamente en la nube y se reflejan al instante en cualquier teléfono, tablet o computadora.
         </p>
 
         <div style="display: flex; flex-direction: column; gap: 14px;">
+          <div
+            style="background: #eff6ff; padding: 16px; border-radius: var(--radius-md); border: 1px solid #bfdbfe;">
+            <strong style="display: block; font-size: 0.95rem; color: #1e40af; margin-bottom: 4px;">Subir Datos Locales Previos a la Nube (Firebase)</strong>
+            <p style="font-size: 0.82rem; color: #1e3a8a; margin-bottom: 12px;">Si hiciste cambios antes en este navegador, súbelos directamente a la base de datos de Firebase para que todos los vean.</p>
+            <button class="btn-primary-action" id="btn-sync-cloud-db">
+              ☁️ Subir mi Base Local a Firebase
+            </button>
+          </div>
+
           <div
             style="background: var(--bg-input); padding: 16px; border-radius: var(--radius-md); border: 1px solid var(--border-light);">
             <strong style="display: block; font-size: 0.95rem; margin-bottom: 4px;">Copia de Seguridad
@@ -814,7 +828,11 @@
     </div>
   </footer>
 
-  <!-- Scripts -->
+  <!-- Firebase SDK Compat (para sincronización multi-dispositivo en GitHub Pages) -->
+  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
+
+  <!-- Scripts de la Aplicación -->
   <script src="js/db.js"></script>
   <script src="js/auth.js"></script>
   <script src="js/app.js"></script>

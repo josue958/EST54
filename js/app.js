@@ -1660,6 +1660,27 @@ document.addEventListener('DOMContentLoaded', async () => {
       const fileInput = document.getElementById('import-file-input');
       const btnReset = document.getElementById('btn-reset-db');
       const closeBtn = document.getElementById('close-db-modal');
+      const btnSyncCloud = document.getElementById('btn-sync-cloud-db');
+
+      if (btnSyncCloud) {
+        btnSyncCloud.onclick = async () => {
+          try {
+            btnSyncCloud.disabled = true;
+            btnSyncCloud.textContent = '⏳ Subiendo datos a Firebase...';
+            const res = await window.est54DB.syncLocalToFirestore();
+            this.showToast(`¡Sincronizado con éxito! (${res.blocks} temas, ${res.events} eventos)`, 'success');
+            modal.classList.remove('open');
+            await this.loadBlocks();
+            await this.loadEvents();
+            if (window.est54Auth.canManageUsers()) await this.loadUsers();
+          } catch (err) {
+            this.showToast('Error sincronizando con Firebase: ' + err.message, 'danger');
+          } finally {
+            btnSyncCloud.disabled = false;
+            btnSyncCloud.textContent = '☁️ Subir mi Base Local a Firebase';
+          }
+        };
+      }
 
       if (btnExport) {
         btnExport.onclick = async () => {

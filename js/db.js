@@ -5,6 +5,17 @@
  * Publicación de Eventos Escolares con Redes Sociales y Gestión CRUD de Usuarios y Permisos.
  */
 
+// Configuración de Firebase Cloud Firestore (Google Cloud)
+const FIREBASE_CONFIG = {
+  apiKey: "AIzaSyAFC99dMqPhEr9LPXr5F3VP0BFp3lLyapE",
+  authDomain: "est54-89b31.firebaseapp.com",
+  projectId: "est54-89b31",
+  storageBucket: "est54-89b31.firebasestorage.app",
+  messagingSenderId: "172800863042",
+  appId: "1:172800863042:web:4c5457b9ac2344482536db",
+  measurementId: "G-1CHXRZ068D"
+};
+
 const DB_NAME = 'EST54_EduHub_DB';
 const DB_VERSION = 2;
 const STORE_NAME = 'content_blocks';
@@ -350,10 +361,50 @@ const INITIAL_USERS = [
 class EST54Database {
   constructor() {
     this.db = null;
+    this.firestore = null;
+    this.isFirebaseReady = false;
     this.isIndexedDBReady = false;
   }
 
   async init() {
+    // 1. Inicializar almacenamiento local (IndexedDB) como base y caché
+    await this._initIndexedDB();
+
+    // 2. Inicializar Firebase Cloud Firestore
+    await this._initFirebase();
+
+    return this;
+  }
+
+  async _initFirebase() {
+    if (typeof firebase === 'undefined') {
+      console.warn('Firebase SDK no encontrado en window, usando IndexedDB local.');
+      return;
+    }
+
+    try {
+      if (!firebase.apps || !firebase.apps.length) {
+        firebase.initializeApp(FIREBASE_CONFIG);
+      }
+      this.firestore = firebase.firestore();
+
+      // Probar lectura para verificar conexión y reglas de seguridad
+      const testSnap = await this.firestore.collection(STORE_NAME).limit(1).get();
+      this.isFirebaseReady = true;
+      console.log('🔥 Firebase Cloud Firestore conectado exitosamente.');
+
+      // Si la colección de Firestore está vacía, sembramos datos iniciales o locales existentes
+      if (testSnap.empty) {
+        console.log('🔥 Firestore vacío detectado. Sincronizando datos a la nube...');
+        await this.syncLocalToFirestore(true);
+      }
+    } catch (err) {
+      console.warn('No se pudo inicializar Firebase Cloud Firestore (usando IndexedDB local):', err);
+      this.isFirebaseReady = false;
+    }
+  }
+
+  async _initIndexedDB() {
     return new Promise((resolve) => {
       if (!window.indexedDB) {
         console.warn('IndexedDB no soportado en este navegador, usando LocalStorage como fallback.');
@@ -392,7 +443,6 @@ class EST54Database {
       request.onsuccess = async (event) => {
         this.db = event.target.result;
         this.isIndexedDBReady = true;
-
         await this._ensureSeedData();
         resolve(this);
       };
@@ -462,25 +512,62 @@ class EST54Database {
   }
 
   // ==========================================================================
+  // SINCRONIZACIÓN LOCAL -> NUBE (FIREBASE)
+  // ==========================================================================
+
+  async syncLocalToFirestore(isInitialSeed = false) {
+    if (!this.isFirebaseReady) {
+      throw new Error('Firebase Firestore no está disponible en este momento. Revisa tu conexión o reglas de Firestore.');
+    }
+
+    let blocks = await this._getLocalBlocks();
+    let events = await this._getLocalEvents();
+    let users = await this._getLocalUsers();
+
+    if (!blocks || blocks.length === 0) blocks = INITIAL_DATA;
+    if (!events || events.length === 0) events = INITIAL_EVENTS;
+    if (!users || users.length === 0) users = INITIAL_USERS;
+
+    const batch = this.firestore.batch();
+
+    for (const b of blocks) {
+      const ref = this.firestore.collection(STORE_NAME).doc(b.id);
+      batch.set(ref, JSON.parse(JSON.stringify(b)), { merge: true });
+    }
+
+    for (const ev of events) {
+      const ref = this.firestore.collection(STORE_EVENTS).doc(ev.id);
+      batch.set(ref, JSON.parse(JSON.stringify(ev)), { merge: true });
+    }
+
+    for (const u of users) {
+      const ref = this.firestore.collection(STORE_USERS).doc(u.id);
+      batch.set(ref, JSON.parse(JSON.stringify(u)), { merge: true });
+    }
+
+    await batch.commit();
+    console.log(`🔥 Sincronizado a Firebase Firestore: ${blocks.length} temas, ${events.length} eventos, ${users.length} usuarios.`);
+    return { blocks: blocks.length, events: events.length, users: users.length };
+  }
+
+  // ==========================================================================
   // BLOQUES DE ESTUDIO (CRUD)
   // ==========================================================================
 
   async getAllBlocks() {
-    if (!this.isIndexedDBReady) {
-      const raw = localStorage.getItem(STORAGE_BLOCKS_KEY) || '[]';
-      return JSON.parse(raw);
+    if (this.isFirebaseReady) {
+      try {
+        const snap = await this.firestore.collection(STORE_NAME).get();
+        const list = [];
+        snap.forEach((doc) => list.push(doc.data()));
+        const sorted = list.sort((a, b) => (a.order || 0) - (b.order || 0));
+        this._cacheLocalBlocks(sorted).catch(() => {});
+        return sorted;
+      } catch (err) {
+        console.error('Error leyendo bloques de Firestore, usando fallback local:', err);
+      }
     }
-
-    return new Promise((resolve, reject) => {
-      const tx = this.db.transaction([STORE_NAME], 'readonly');
-      const store = tx.objectStore(STORE_NAME);
-      const req = store.getAll();
-      req.onsuccess = () => {
-        const sorted = (req.result || []).sort((a, b) => (a.order || 0) - (b.order || 0));
-        resolve(sorted);
-      };
-      req.onerror = () => reject(req.error);
-    });
+    return this._getLocalBlocks();
   }
 
   async getBlocksByGrado(grado) {
@@ -499,6 +586,80 @@ class EST54Database {
       block.order = current.length;
     }
 
+    const clean = JSON.parse(JSON.stringify(block));
+
+    if (this.isFirebaseReady) {
+      try {
+        await this.firestore.collection(STORE_NAME).doc(block.id).set(clean, { merge: true });
+        this._saveLocalBlock(clean).catch(() => {});
+        return block;
+      } catch (err) {
+        console.error('Error guardando bloque en Firestore:', err);
+      }
+    }
+
+    return this._saveLocalBlock(clean);
+  }
+
+  async deleteBlock(id) {
+    if (this.isFirebaseReady) {
+      try {
+        await this.firestore.collection(STORE_NAME).doc(id).delete();
+        this._deleteLocalBlock(id).catch(() => {});
+        return true;
+      } catch (err) {
+        console.error('Error eliminando bloque en Firestore:', err);
+      }
+    }
+    return this._deleteLocalBlock(id);
+  }
+
+  async updateOrder(orderedIds) {
+    const all = await this.getAllBlocks();
+    const idMap = new Map(all.map((b) => [b.id, b]));
+
+    if (this.isFirebaseReady) {
+      try {
+        const batch = this.firestore.batch();
+        orderedIds.forEach((id, index) => {
+          if (idMap.has(id)) {
+            const item = idMap.get(id);
+            item.order = index;
+            batch.update(this.firestore.collection(STORE_NAME).doc(id), { order: index });
+          }
+        });
+        await batch.commit();
+        this._updateLocalOrder(orderedIds).catch(() => {});
+        return true;
+      } catch (err) {
+        console.error('Error actualizando orden en Firestore:', err);
+      }
+    }
+
+    return this._updateLocalOrder(orderedIds);
+  }
+
+  // --- MÉTODOS LOCALES AUXILIARES PARA BLOQUES ---
+
+  async _getLocalBlocks() {
+    if (!this.isIndexedDBReady) {
+      const raw = localStorage.getItem(STORAGE_BLOCKS_KEY) || '[]';
+      return JSON.parse(raw);
+    }
+
+    return new Promise((resolve, reject) => {
+      const tx = this.db.transaction([STORE_NAME], 'readonly');
+      const store = tx.objectStore(STORE_NAME);
+      const req = store.getAll();
+      req.onsuccess = () => {
+        const sorted = (req.result || []).sort((a, b) => (a.order || 0) - (b.order || 0));
+        resolve(sorted);
+      };
+      req.onerror = () => reject(req.error);
+    });
+  }
+
+  async _saveLocalBlock(block) {
     if (!this.isIndexedDBReady) {
       const all = JSON.parse(localStorage.getItem(STORAGE_BLOCKS_KEY) || '[]');
       const index = all.findIndex((b) => b.id === block.id);
@@ -517,7 +678,7 @@ class EST54Database {
     });
   }
 
-  async deleteBlock(id) {
+  async _deleteLocalBlock(id) {
     if (!this.isIndexedDBReady) {
       let all = JSON.parse(localStorage.getItem(STORAGE_BLOCKS_KEY) || '[]');
       all = all.filter((b) => b.id !== id);
@@ -534,8 +695,8 @@ class EST54Database {
     });
   }
 
-  async updateOrder(orderedIds) {
-    const all = await this.getAllBlocks();
+  async _updateLocalOrder(orderedIds) {
+    const all = await this._getLocalBlocks();
     const idMap = new Map(all.map((b) => [b.id, b]));
 
     if (!this.isIndexedDBReady) {
@@ -551,7 +712,6 @@ class EST54Database {
     return new Promise((resolve, reject) => {
       const tx = this.db.transaction([STORE_NAME], 'readwrite');
       const store = tx.objectStore(STORE_NAME);
-
       orderedIds.forEach((id, index) => {
         if (idMap.has(id)) {
           const item = idMap.get(id);
@@ -559,10 +719,18 @@ class EST54Database {
           store.put(item);
         }
       });
-
       tx.oncomplete = () => resolve(true);
       tx.onerror = () => reject(tx.error);
     });
+  }
+
+  async _cacheLocalBlocks(blocks) {
+    if (!this.isIndexedDBReady) return;
+    try {
+      const tx = this.db.transaction([STORE_NAME], 'readwrite');
+      const store = tx.objectStore(STORE_NAME);
+      for (const b of blocks) store.put(b);
+    } catch (e) {}
   }
 
   // ==========================================================================
@@ -570,6 +738,72 @@ class EST54Database {
   // ==========================================================================
 
   async getAllEvents() {
+    if (this.isFirebaseReady) {
+      try {
+        const snap = await this.firestore.collection(STORE_EVENTS).get();
+        const list = [];
+        snap.forEach((doc) => list.push(doc.data()));
+        const sorted = list.sort((a, b) => (b.date || '').localeCompare(a.date || ''));
+        this._cacheLocalEvents(sorted).catch(() => {});
+        return sorted;
+      } catch (err) {
+        console.error('Error leyendo eventos de Firestore, usando fallback local:', err);
+      }
+    }
+    return this._getLocalEvents();
+  }
+
+  async getEventById(id) {
+    if (this.isFirebaseReady) {
+      try {
+        const doc = await this.firestore.collection(STORE_EVENTS).doc(id).get();
+        return doc.exists ? doc.data() : null;
+      } catch (err) {
+        console.error('Error obteniendo evento de Firestore:', err);
+      }
+    }
+    return this._getLocalEventById(id);
+  }
+
+  async saveEvent(event) {
+    if (!event.id) {
+      event.id = 'event-' + Date.now() + '-' + Math.random().toString(36).substr(2, 6);
+    }
+    if (!event.createdAt) {
+      event.createdAt = new Date().toISOString().split('T')[0];
+    }
+
+    const clean = JSON.parse(JSON.stringify(event));
+
+    if (this.isFirebaseReady) {
+      try {
+        await this.firestore.collection(STORE_EVENTS).doc(event.id).set(clean, { merge: true });
+        this._saveLocalEvent(clean).catch(() => {});
+        return event;
+      } catch (err) {
+        console.error('Error guardando evento en Firestore:', err);
+      }
+    }
+
+    return this._saveLocalEvent(clean);
+  }
+
+  async deleteEvent(id) {
+    if (this.isFirebaseReady) {
+      try {
+        await this.firestore.collection(STORE_EVENTS).doc(id).delete();
+        this._deleteLocalEvent(id).catch(() => {});
+        return true;
+      } catch (err) {
+        console.error('Error eliminando evento en Firestore:', err);
+      }
+    }
+    return this._deleteLocalEvent(id);
+  }
+
+  // --- MÉTODOS LOCALES AUXILIARES PARA EVENTOS ---
+
+  async _getLocalEvents() {
     if (!this.isIndexedDBReady) {
       const raw = localStorage.getItem(STORAGE_EVENTS_KEY) || '[]';
       return JSON.parse(raw);
@@ -580,7 +814,6 @@ class EST54Database {
       const store = tx.objectStore(STORE_EVENTS);
       const req = store.getAll();
       req.onsuccess = () => {
-        // Ordenar por fecha descendente o creación
         const sorted = (req.result || []).sort((a, b) => (b.date || '').localeCompare(a.date || ''));
         resolve(sorted);
       };
@@ -588,7 +821,7 @@ class EST54Database {
     });
   }
 
-  async getEventById(id) {
+  async _getLocalEventById(id) {
     if (!this.isIndexedDBReady) {
       const all = JSON.parse(localStorage.getItem(STORAGE_EVENTS_KEY) || '[]');
       return all.find((e) => e.id === id) || null;
@@ -603,14 +836,7 @@ class EST54Database {
     });
   }
 
-  async saveEvent(event) {
-    if (!event.id) {
-      event.id = 'event-' + Date.now() + '-' + Math.random().toString(36).substr(2, 6);
-    }
-    if (!event.createdAt) {
-      event.createdAt = new Date().toISOString().split('T')[0];
-    }
-
+  async _saveLocalEvent(event) {
     if (!this.isIndexedDBReady) {
       const all = JSON.parse(localStorage.getItem(STORAGE_EVENTS_KEY) || '[]');
       const index = all.findIndex((e) => e.id === event.id);
@@ -629,7 +855,7 @@ class EST54Database {
     });
   }
 
-  async deleteEvent(id) {
+  async _deleteLocalEvent(id) {
     if (!this.isIndexedDBReady) {
       let all = JSON.parse(localStorage.getItem(STORAGE_EVENTS_KEY) || '[]');
       all = all.filter((e) => e.id !== id);
@@ -646,38 +872,44 @@ class EST54Database {
     });
   }
 
+  async _cacheLocalEvents(events) {
+    if (!this.isIndexedDBReady) return;
+    try {
+      const tx = this.db.transaction([STORE_EVENTS], 'readwrite');
+      const store = tx.objectStore(STORE_EVENTS);
+      for (const e of events) store.put(e);
+    } catch (e) {}
+  }
+
   // ==========================================================================
   // USUARIOS Y PERMISOS (CRUD)
   // ==========================================================================
 
   async getAllUsers() {
-    if (!this.isIndexedDBReady) {
-      const raw = localStorage.getItem(STORAGE_USERS_KEY) || '[]';
-      return JSON.parse(raw);
+    if (this.isFirebaseReady) {
+      try {
+        const snap = await this.firestore.collection(STORE_USERS).get();
+        const list = [];
+        snap.forEach((doc) => list.push(doc.data()));
+        this._cacheLocalUsers(list).catch(() => {});
+        return list;
+      } catch (err) {
+        console.error('Error leyendo usuarios de Firestore, usando fallback local:', err);
+      }
     }
-
-    return new Promise((resolve, reject) => {
-      const tx = this.db.transaction([STORE_USERS], 'readonly');
-      const store = tx.objectStore(STORE_USERS);
-      const req = store.getAll();
-      req.onsuccess = () => resolve(req.result || []);
-      req.onerror = () => reject(req.error);
-    });
+    return this._getLocalUsers();
   }
 
   async getUserById(id) {
-    if (!this.isIndexedDBReady) {
-      const all = JSON.parse(localStorage.getItem(STORAGE_USERS_KEY) || '[]');
-      return all.find((u) => u.id === id) || null;
+    if (this.isFirebaseReady) {
+      try {
+        const doc = await this.firestore.collection(STORE_USERS).doc(id).get();
+        return doc.exists ? doc.data() : null;
+      } catch (err) {
+        console.error('Error obteniendo usuario de Firestore:', err);
+      }
     }
-
-    return new Promise((resolve, reject) => {
-      const tx = this.db.transaction([STORE_USERS], 'readonly');
-      const store = tx.objectStore(STORE_USERS);
-      const req = store.get(id);
-      req.onsuccess = () => resolve(req.result || null);
-      req.onerror = () => reject(req.error);
-    });
+    return this._getLocalUserById(id);
   }
 
   async getUserByUsername(username) {
@@ -702,7 +934,6 @@ class EST54Database {
       };
     }
 
-    // Proteger al superadmin root
     if (user.username === 'josue958') {
       user.isSuperAdmin = true;
       user.permissions.canEditGrado1 = true;
@@ -712,6 +943,73 @@ class EST54Database {
       user.permissions.canManageUsers = true;
     }
 
+    const clean = JSON.parse(JSON.stringify(user));
+
+    if (this.isFirebaseReady) {
+      try {
+        await this.firestore.collection(STORE_USERS).doc(user.id).set(clean, { merge: true });
+        this._saveLocalUser(clean).catch(() => {});
+        return user;
+      } catch (err) {
+        console.error('Error guardando usuario en Firestore:', err);
+      }
+    }
+
+    return this._saveLocalUser(clean);
+  }
+
+  async deleteUser(id) {
+    const user = await this.getUserById(id);
+    if (user && user.username === 'josue958') {
+      throw new Error('El usuario administrador principal no puede ser eliminado.');
+    }
+
+    if (this.isFirebaseReady) {
+      try {
+        await this.firestore.collection(STORE_USERS).doc(id).delete();
+        this._deleteLocalUser(id).catch(() => {});
+        return true;
+      } catch (err) {
+        console.error('Error eliminando usuario en Firestore:', err);
+      }
+    }
+
+    return this._deleteLocalUser(id);
+  }
+
+  // --- MÉTODOS LOCALES AUXILIARES PARA USUARIOS ---
+
+  async _getLocalUsers() {
+    if (!this.isIndexedDBReady) {
+      const raw = localStorage.getItem(STORAGE_USERS_KEY) || '[]';
+      return JSON.parse(raw);
+    }
+
+    return new Promise((resolve, reject) => {
+      const tx = this.db.transaction([STORE_USERS], 'readonly');
+      const store = tx.objectStore(STORE_USERS);
+      const req = store.getAll();
+      req.onsuccess = () => resolve(req.result || []);
+      req.onerror = () => reject(req.error);
+    });
+  }
+
+  async _getLocalUserById(id) {
+    if (!this.isIndexedDBReady) {
+      const all = JSON.parse(localStorage.getItem(STORAGE_USERS_KEY) || '[]');
+      return all.find((u) => u.id === id) || null;
+    }
+
+    return new Promise((resolve, reject) => {
+      const tx = this.db.transaction([STORE_USERS], 'readonly');
+      const store = tx.objectStore(STORE_USERS);
+      const req = store.get(id);
+      req.onsuccess = () => resolve(req.result || null);
+      req.onerror = () => reject(req.error);
+    });
+  }
+
+  async _saveLocalUser(user) {
     if (!this.isIndexedDBReady) {
       const all = JSON.parse(localStorage.getItem(STORAGE_USERS_KEY) || '[]');
       const index = all.findIndex((u) => u.id === user.id);
@@ -730,12 +1028,7 @@ class EST54Database {
     });
   }
 
-  async deleteUser(id) {
-    const user = await this.getUserById(id);
-    if (user && user.username === 'josue958') {
-      throw new Error('El usuario administrador principal no puede ser eliminado.');
-    }
-
+  async _deleteLocalUser(id) {
     if (!this.isIndexedDBReady) {
       let all = JSON.parse(localStorage.getItem(STORAGE_USERS_KEY) || '[]');
       all = all.filter((u) => u.id !== id);
@@ -750,6 +1043,15 @@ class EST54Database {
       req.onsuccess = () => resolve(true);
       req.onerror = () => reject(req.error);
     });
+  }
+
+  async _cacheLocalUsers(users) {
+    if (!this.isIndexedDBReady) return;
+    try {
+      const tx = this.db.transaction([STORE_USERS], 'readwrite');
+      const store = tx.objectStore(STORE_USERS);
+      for (const u of users) store.put(u);
+    } catch (e) {}
   }
 
   // ==========================================================================
@@ -778,6 +1080,22 @@ class EST54Database {
         if (parsed.users) users = parsed.users;
       }
 
+      // Si Firebase está conectado, actualizar la nube
+      if (this.isFirebaseReady) {
+        const batch = this.firestore.batch();
+        for (const b of blocks) {
+          batch.set(this.firestore.collection(STORE_NAME).doc(b.id), JSON.parse(JSON.stringify(b)));
+        }
+        for (const ev of events) {
+          batch.set(this.firestore.collection(STORE_EVENTS).doc(ev.id), JSON.parse(JSON.stringify(ev)));
+        }
+        for (const u of users) {
+          batch.set(this.firestore.collection(STORE_USERS).doc(u.id), JSON.parse(JSON.stringify(u)));
+        }
+        await batch.commit();
+      }
+
+      // Actualizar local
       if (this.isIndexedDBReady) {
         const tx = this.db.transaction([STORE_NAME, STORE_EVENTS, STORE_USERS], 'readwrite');
         const sBlocks = tx.objectStore(STORE_NAME);
@@ -811,6 +1129,22 @@ class EST54Database {
   }
 
   async resetDefault() {
+    // Si Firebase está conectado, resetear Firestore
+    if (this.isFirebaseReady) {
+      const batch = this.firestore.batch();
+      for (const b of INITIAL_DATA) {
+        batch.set(this.firestore.collection(STORE_NAME).doc(b.id), JSON.parse(JSON.stringify(b)));
+      }
+      for (const ev of INITIAL_EVENTS) {
+        batch.set(this.firestore.collection(STORE_EVENTS).doc(ev.id), JSON.parse(JSON.stringify(ev)));
+      }
+      for (const u of INITIAL_USERS) {
+        batch.set(this.firestore.collection(STORE_USERS).doc(u.id), JSON.parse(JSON.stringify(u)));
+      }
+      await batch.commit();
+    }
+
+    // Resetear local
     if (this.isIndexedDBReady) {
       const tx = this.db.transaction([STORE_NAME, STORE_EVENTS, STORE_USERS], 'readwrite');
       const sBlocks = tx.objectStore(STORE_NAME);
