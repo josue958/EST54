@@ -56,19 +56,12 @@ Plataforma educativa inspirada en el diseño moderno de **[Quizlet](https://quiz
 ## 📦 Conexión con GitHub y Despliegue en GitHub Pages
 
 El repositorio está vinculado al proyecto oficial de GitHub:
+
 - **Repositorio Remoto:** [https://github.com/josue958/EST54](https://github.com/josue958/EST54)
 - **Sitio Web Público:** [https://josue958.github.io/EST54/](https://josue958.github.io/EST54/)
 
 Para subir tus cambios a GitHub:
+
 ```bash
 git push origin main
 ```
-
----
-
-## 🛠️ Credenciales de Administrador
-
-| Campo | Valor |
-| :--- | :--- |
-| **Usuario** | `josue958` |
-| **Contraseña** | `Yoshi985` |
